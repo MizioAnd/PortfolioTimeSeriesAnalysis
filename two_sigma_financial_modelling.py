@@ -70,7 +70,8 @@ df_assets = df.groupby('id')['y'].agg(['mean', 'std', len]).reset_index()
 print(df_assets.head())
 
 # Plot target value of asset id=0 as function of timestamp
-asset_0 = df[df.id == 0]
+asset_id = 0
+asset_0 = df[df.id == asset_id]
 # asset_0 = df.loc[df.id == 0, ('timestamp', 'y')].groupby('timestamp')
 plt.figure()
 plt.plot(asset_0.timestamp.values, asset_0.y.values, '.')
@@ -78,6 +79,7 @@ plt.plot(asset_0.timestamp.values, asset_0.y.values.cumsum())
 plt.legend(('asset val', 'cumulative asset value'), loc=1, borderaxespad=0.)
 plt.xlabel('timestamp')
 plt.ylabel('asset value')
+plt.title(''.join(['Asset ', str(asset_id)]))
 plt.show()
 
 # Visualize market run over the time period
@@ -89,28 +91,23 @@ market_return_df = df[['timestamp', 'y']].groupby('timestamp').agg([np.mean, np.
 timestamp = market_return_df['timestamp']
 y_mean = np.array(market_return_df['y']['mean'])
 y_std = np.array(market_return_df['y']['std'])
+# Number of assets traded for each unique timestamp
 size_of_portfolio = np.array(market_return_df['y']['len'])
 
 # Todo: make subplots
-plt.figure()
-plt.plot(timestamp, y_mean, '.')
-plt.xlabel('timestamp')
-plt.ylabel('y mean')
+f, axarr = plt.subplots(3, sharex=True)
+axarr[0].plot(timestamp, y_mean, '.')
+axarr[0].set_ylabel('y mean')
 
+axarr[1].plot(timestamp, y_std, '.')
+axarr[1].set_ylabel('y std')
 
-plt.figure()
-plt.plot(timestamp, y_std, '.')
-plt.xlabel('timestamp')
-plt.ylabel('y std')
+axarr[2].plot(timestamp, size_of_portfolio, '.')
+axarr[2].set_ylabel('size of portfolio')
 
-
-plt.figure()
-plt.plot(timestamp, size_of_portfolio, '.')
-plt.xlabel('timestamp')
-plt.ylabel('size of portfolio')
+axarr[2].set_xlabel('timestamp')
 plt.show()
 # Comm.: we see that timestamp 250 and 1550 has high variation in mean value.
-
 
 # Plot correlations between mean, std of 'y' and size of portfolio.
 sns.set()
