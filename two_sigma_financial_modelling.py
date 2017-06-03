@@ -58,7 +58,6 @@ print(len(df.timestamp.unique()))  # shows the number of periods in time
 features = ['timestamp', 'derived_0', 'derived_1', 'derived_2', 'derived_3', 'derived_4']
 # features = ['timestamp', 'derived_1']
 # df[features].groupby('timestamp').agg([np.mean]).reset_index().apply(np.log1p).hist(bins='auto', alpha=0.5)
-# plt.show()
 
 df_derived_features = df[features].groupby('timestamp').agg([np.mean, np.std, len]).reset_index()
 print(df_derived_features.head())
@@ -80,7 +79,28 @@ plt.legend(('asset value', 'cumulative asset value'), loc=1, borderaxespad=0.)
 plt.xlabel('timestamp')
 plt.ylabel('asset value')
 plt.title(''.join(['Asset ', str(asset_id)]))
-plt.show()
+
+# When are the assets sold and bought?
+# how can we be sure that they are not sold in between and hold for less time? checking on amax of timestamp just
+# indicates first time the asset is bought and last time indicates last time the asset is sold.
+
+# Todo: make check on intermediate sale of asset
+df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
+df_grouped_by_id.sort_values([('timestamp', 'amax')], inplace=True, ascending=False)
+print(df_grouped_by_id.head())
+
+# Plot without check on intermediate sales
+plt.figure()
+plt.plot(df_grouped_by_id[('timestamp', 'amin')], df_grouped_by_id.id, '.', label='bought')
+plt.plot(df_grouped_by_id[('timestamp', 'amax')], df_grouped_by_id.id, '.', color='r', label='sold')
+plt.xlabel('timestamp')
+plt.ylabel('asset id')
+plt.legend()
+
+# Check on intermediate sales
+# check if len - 1 of timestamps equals amax - amin
+is_with_intermediate_sale = (df_grouped_by_id[('timestamp', 'amax')] - df_grouped_by_id[('timestamp', 'amin')]).values != df_grouped_by_id[('timestamp', 'len')].values - 1
+print(''.join(['Number of intermediate sold assets', str(is_with_intermediate_sale.sum())]))
 
 # Visualize market run over the time period
 market_return_df = df[['timestamp', 'y']].groupby('timestamp').agg([np.mean, np.std, len]).reset_index()
@@ -105,14 +125,12 @@ axarr[2].plot(timestamp, size_of_portfolio, '.')
 axarr[2].set_ylabel('size of portfolio')
 
 axarr[2].set_xlabel('timestamp')
-plt.show()
 # Comm.: we see that timestamp 250 and 1550 has high variation in mean value.
 
 # Plot correlations between mean, std of 'y' and size of portfolio.
 sns.set()
 columns = ['mean', 'std', 'len']
 sns.pairplot(market_return_df['y'][columns], size=2.5)
-plt.show()
 
 # Price chart for returns of portfolio. This corresponds to the mean of y of the portfolio.
 # Plot is together with mean of y of portfolio.
