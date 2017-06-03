@@ -76,7 +76,7 @@ asset_0 = df[df.id == asset_id]
 plt.figure()
 plt.plot(asset_0.timestamp.values, asset_0.y.values, '.')
 plt.plot(asset_0.timestamp.values, asset_0.y.values.cumsum())
-plt.legend(('asset val', 'cumulative asset value'), loc=1, borderaxespad=0.)
+plt.legend(('asset value', 'cumulative asset value'), loc=1, borderaxespad=0.)
 plt.xlabel('timestamp')
 plt.ylabel('asset value')
 plt.title(''.join(['Asset ', str(asset_id)]))
@@ -94,7 +94,6 @@ y_std = np.array(market_return_df['y']['std'])
 # Number of assets traded for each unique timestamp
 size_of_portfolio = np.array(market_return_df['y']['len'])
 
-# Todo: make subplots
 f, axarr = plt.subplots(3, sharex=True)
 axarr[0].plot(timestamp, y_mean, '.')
 axarr[0].set_ylabel('y mean')
@@ -115,5 +114,14 @@ columns = ['mean', 'std', 'len']
 sns.pairplot(market_return_df['y'][columns], size=2.5)
 plt.show()
 
-
+# Price chart for returns of portfolio. This corresponds to the mean of y of the portfolio.
+# Plot is together with mean of y of portfolio.
+plt.figure()
+plt.plot(timestamp, y_mean, '.')
+plt.plot(timestamp, y_mean.cumsum())
+plt.legend(('portfolio value', 'cumulative portfolio value'), loc=1, borderaxespad=0.)
+plt.xlabel('timestamp')
+plt.ylabel('y mean')
+plt.title('Portfolio returns')
+plt.show()
 
