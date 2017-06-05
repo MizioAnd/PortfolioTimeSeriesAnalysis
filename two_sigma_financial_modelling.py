@@ -61,16 +61,83 @@ class TwoSigmaFinModTools:
         # df_grouped_by_id_with_intermediate_trade = df_grouped_by_id[df.id == id]
         amin = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amin')]
         amax = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amax')]
-        asset_timestamps = df[['timestamp', 'id']][df.id == id].groupby('timestamp').timestamp
-        asset_timestamps_length = len(asset_timestamps)
-        midway_timestamps = round(asset_timestamps/2)
-        # Check left part
-        amin_left = df_grouped_by_id[(df.id == id & df.timestamp < midway_timestamps)][('timestamp', 'amin')]
-        amax_left = df_grouped_by_id[(df.id == id & df.timestamp < midway_timestamps)][('timestamp', 'amax')]
-        timestamp_diff_with_len_left = (df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amax')]
-                                        - df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amin')]).values \
-                                       != (df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'len')] - 1)
-        # Define recursive function
+        # asset_timestamps = df[['timestamp', 'id']][df.id == id].groupby('timestamp').timestamp
+        # asset_timestamps_length = len(asset_timestamps)
+        # midway_timestamps = round(asset_timestamps/2)
+
+        intermediate_trade_timestamp_of_asset = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax)
+        # More general case: What if there are several intermediate trades?
+
+    def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax):
+        '''
+        # method structure
+        # 1)compute left part
+        # 2a) check if left part is unique, if True compute right part
+        # 2a,i) return amax and amin of right part
+        # 2a,ii) divide right part in two and compute again left part starting in 1)
+        # 2b) else if left part is not unique then return amax and amin of left part
+        # 2b,i) divide left part in two and compute again left part starting in 1)
+        :param df:
+        :param df_grouped_by_id:
+        :param amin:
+        :param amax:
+        :return:
+        '''
+        asset_timestamps = df[['timestamp', 'id']][(df.id == id & df.timestamp > amin
+                                                    & df.timestamp < amax)].groupby('timestamp').timestamp
+        midway_timestamp = asset_timestamps(round(len(asset_timestamps)/2))
+
+        is_timestamp_diff_equal_len_left, amin_left, amax_left = self.check_timestamps_left_part(df, df_grouped_by_id,
+                                                                                                 midway_timestamp, amin)
+        if is_timestamp_diff_equal_len_left:
+            is_timestamp_diff_equal_len_right, amin_right, amax_right = \
+                self.check_timestamps_right_part(df, df_grouped_by_id, midway_timestamp, amax)
+            if is_timestamp_diff_equal_len_right:
+                return amax_right
+            else:
+                return self.recursive_left_right_check(df, df_grouped_by_id, amin_right, amin_right)
+
+        else:
+            return self.recursive_left_right_check(df, df_grouped_by_id, amin_left, amax_left)
+
+    def check_timestamps_left_part(self, df, df_grouped_by_id, midway_timestamps, amin):
+        '''
+        Check left part
+
+        :param df:
+        :param df_grouped_by_id:
+        :param midway_timestamps:
+        :return: True if intermediate sale is in left part False otherwise.
+        '''
+
+        amin_left = df_grouped_by_id[(df.id == id & df.timestamp > amin
+                                      & df.timestamp < midway_timestamps)][('timestamp', 'amin')]
+        amax_left = df_grouped_by_id[(df.id == id & df.timestamp > amin
+                                      & df.timestamp < midway_timestamps)][('timestamp', 'amax')]
+        is_timestamp_diff_equal_len_left = (amax_left- amin_left).values.values \
+                                           == (df_grouped_by_id[(df.id == id & df.timestamp > amin
+                                                                 & df.timestamp < midway_timestamps)][('timestamp',
+                                                                                                       'len')] - 1)
+        return is_timestamp_diff_equal_len_left, amin_left, amax_left
+
+    def check_timestamps_right_part(self, df, df_grouped_by_id, midway_timestamps, amax):
+        '''
+        Check right part
+
+        :param df:
+        :param df_grouped_by_id:
+        :param midway_timestamps:
+        :return: True if intermediate sale is in left part False otherwise.
+        '''
+
+        amin_right = df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
+                                       & df.timestamp < amax)][('timestamp', 'amin')]
+        amax_right = df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
+                                       & df.timestamp < amax)][('timestamp', 'amax')]
+        is_timestamp_diff_equal_len_right = (amax_right - amin_right).values \
+                                            == (df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
+                                                                  & df.timestamp < amax)][('timestamp', 'len')] - 1)
+        return is_timestamp_diff_equal_len_right, amin_right, amax_right
 
 
 def main():
