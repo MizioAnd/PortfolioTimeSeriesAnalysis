@@ -57,16 +57,23 @@ class TwoSigmaFinModTools:
         print(timestamp_length_and_len_diffs)
 
         # Cut in two and check if amax is equal to length of cutted part
-        id = id_with_intermediate_trades[0]
-        # df_grouped_by_id_with_intermediate_trade = df_grouped_by_id[df.id == id]
-        amin = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amin')]
-        amax = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amax')]
-        # asset_timestamps = df[['timestamp', 'id']][df.id == id].groupby('timestamp').timestamp
-        # asset_timestamps_length = len(asset_timestamps)
-        # midway_timestamps = round(asset_timestamps/2)
 
-        intermediate_trade_timestamp_of_asset = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax)
-        # More general case: What if there are several intermediate trades?
+        # Assuming only one intermediate sale exists
+        intermediate_trade_timestamp_of_assets = np.zeros((1, len(timestamp_length_and_len_diffs)))
+        for ite in np.arange(0, len(id_with_intermediate_trades)):
+            id = id_with_intermediate_trades[ite]
+            # df_grouped_by_id_with_intermediate_trade = df_grouped_by_id[df.id == id]
+            amin = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amin')]
+            amax = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amax')]
+            # asset_timestamps = df[['timestamp', 'id']][df.id == id].groupby('timestamp').timestamp
+            # asset_timestamps_length = len(asset_timestamps)
+            # midway_timestamps = round(asset_timestamps/2)
+
+            # Todo: More general case: What if there are several intermediate trades?
+
+            intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax)
+
+        return np.array([id_with_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
 
     def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax):
         '''
@@ -242,6 +249,8 @@ def main():
     is_with_intermediate_sale = (df_grouped_by_id[('timestamp', 'amax')] - df_grouped_by_id[('timestamp', 'amin')]).values \
                                 != (df_grouped_by_id[('timestamp', 'len')] - 1)
     print(''.join(['Number of intermediate sold assets: ', str(is_with_intermediate_sale.sum())]))
+
+
 
     # Visualize market run over the time period
     market_return_df = df[['timestamp', 'y']].groupby('timestamp').agg([np.mean, np.std, len]).reset_index()
