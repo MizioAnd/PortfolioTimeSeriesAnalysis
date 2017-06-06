@@ -36,6 +36,7 @@ class TwoSigmaFinModTools:
 
     def assets_with_intermediate_sales(self, df, is_with_intermediate_sale):
         df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
+        df_grouped_by_id.sort_values([('timestamp', 'amax')], inplace=True, ascending=False)
         # Todo: identify intermediate sale positions
         # what are the length differences
         # 1) make cutting strategi that checks on amax until the intermediate amax is found.
@@ -46,12 +47,14 @@ class TwoSigmaFinModTools:
         # 4i) then make check on left part of new cut to see if amax equals len. If True iterate from 3) if False iterate 4).
 
         # id of assets with intermediate trades
-        id_with_intermediate_trades = np.where(is_with_intermediate_sale)[0]
+        is_with_intermediate_sale = is_with_intermediate_sale.drop(['index'], axis=1)
+        indices_with_intermediate_trades = np.where(is_with_intermediate_sale)[0]
+        id_for_intermediate_trades = df_grouped_by_id.reset_index().loc[indices_with_intermediate_trades,].id.values
 
         # Timestamp length diffs with len for assets with intermediate sale
         timestamp_length_and_len_diffs = (df_grouped_by_id[('timestamp', 'amax')]
                                           - df_grouped_by_id[('timestamp', 'amin')]
-                                          - (df_grouped_by_id[('timestamp', 'len')] - 1))[is_with_intermediate_sale]
+                                          - (df_grouped_by_id[('timestamp', 'len')] - 1)).reset_index().loc[indices_with_intermediate_trades]
         print('\n')
         print('timestamp length and len diffs:', '\n')
         print(timestamp_length_and_len_diffs)
@@ -60,8 +63,8 @@ class TwoSigmaFinModTools:
 
         # Assuming only one intermediate sale exists
         intermediate_trade_timestamp_of_assets = np.zeros((1, len(timestamp_length_and_len_diffs)))
-        for ite in np.arange(0, len(id_with_intermediate_trades)):
-            id = id_with_intermediate_trades[ite]
+        for ite in np.arange(0, len(id_for_intermediate_trades)):
+            id = id_for_intermediate_trades[ite]
             # df_grouped_by_id_with_intermediate_trade = df_grouped_by_id[df.id == id]
             amin = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amin')]
             amax = df_grouped_by_id[df_grouped_by_id.id == id][('timestamp', 'amax')]
@@ -71,11 +74,11 @@ class TwoSigmaFinModTools:
 
             # Todo: More general case: What if there are several intermediate trades?
 
-            intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax)
+            intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax, id)
 
-        return np.array([id_with_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
+        return np.array([id_for_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
 
-    def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax):
+    def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax, id):
         '''
         # method structure
         # 1)compute left part
@@ -90,9 +93,9 @@ class TwoSigmaFinModTools:
         :param amax:
         :return:
         '''
-        asset_timestamps = df[['timestamp', 'id']][(df.id == id & df.timestamp > amin
-                                                    & df.timestamp < amax)].groupby('timestamp').timestamp
-        midway_timestamp = asset_timestamps(round(len(asset_timestamps)/2))
+        asset_timestamps = df[['timestamp', 'id']][(df.id == id) & (df.timestamp >= amin.values[0]) & (df.timestamp <= amax.values[0])].groupby('timestamp').timestamp
+        # Find midway timestamp of particular id
+        midway_timestamp = asset_timestamps[round(len(asset_timestamps.values)/2)]
 
         is_timestamp_diff_equal_len_left, amin_left, amax_left = self.check_timestamps_left_part(df, df_grouped_by_id,
                                                                                                  midway_timestamp, amin)
@@ -103,7 +106,6 @@ class TwoSigmaFinModTools:
                 return amax_right
             else:
                 return self.recursive_left_right_check(df, df_grouped_by_id, amin_right, amin_right)
-
         else:
             return self.recursive_left_right_check(df, df_grouped_by_id, amin_left, amax_left)
 
@@ -117,13 +119,13 @@ class TwoSigmaFinModTools:
         :return: True if intermediate sale is in left part False otherwise.
         '''
 
-        amin_left = df_grouped_by_id[(df.id == id & df.timestamp > amin
-                                      & df.timestamp < midway_timestamps)][('timestamp', 'amin')]
-        amax_left = df_grouped_by_id[(df.id == id & df.timestamp > amin
-                                      & df.timestamp < midway_timestamps)][('timestamp', 'amax')]
+        amin_left = df_grouped_by_id[(df.id == id & df.timestamp >= amin
+                                      & df.timestamp <= midway_timestamps)][('timestamp', 'amin')]
+        amax_left = df_grouped_by_id[(df.id == id & df.timestamp >= amin
+                                      & df.timestamp <= midway_timestamps)][('timestamp', 'amax')]
         is_timestamp_diff_equal_len_left = (amax_left- amin_left).values.values \
-                                           == (df_grouped_by_id[(df.id == id & df.timestamp > amin
-                                                                 & df.timestamp < midway_timestamps)][('timestamp',
+                                           == (df_grouped_by_id[(df.id == id & df.timestamp >= amin
+                                                                 & df.timestamp <= midway_timestamps)][('timestamp',
                                                                                                        'len')] - 1)
         return is_timestamp_diff_equal_len_left, amin_left, amax_left
 
@@ -138,12 +140,12 @@ class TwoSigmaFinModTools:
         '''
 
         amin_right = df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
-                                       & df.timestamp < amax)][('timestamp', 'amin')]
+                                       & df.timestamp <= amax)][('timestamp', 'amin')]
         amax_right = df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
-                                       & df.timestamp < amax)][('timestamp', 'amax')]
+                                       & df.timestamp <= amax)][('timestamp', 'amax')]
         is_timestamp_diff_equal_len_right = (amax_right - amin_right).values \
                                             == (df_grouped_by_id[(df.id == id & df.timestamp > midway_timestamps
-                                                                  & df.timestamp < amax)][('timestamp', 'len')] - 1)
+                                                                  & df.timestamp <= amax)][('timestamp', 'len')] - 1)
         return is_timestamp_diff_equal_len_right, amin_right, amax_right
 
 
@@ -246,10 +248,13 @@ def main():
 
     # Check on intermediate sales
     # check if len - 1 of timestamps equals amax - amin
-    is_with_intermediate_sale = (df_grouped_by_id[('timestamp', 'amax')] - df_grouped_by_id[('timestamp', 'amin')]).values \
-                                != (df_grouped_by_id[('timestamp', 'len')] - 1)
-    print(''.join(['Number of intermediate sold assets: ', str(is_with_intermediate_sale.sum())]))
-
+    is_with_intermediate_sale = ((df_grouped_by_id[('timestamp', 'amax')] - df_grouped_by_id[('timestamp', 'amin')])
+                                 != (df_grouped_by_id[('timestamp', 'len')] - 1)).reset_index()
+    print(''.join(['Number of intermediate sold assets: ', str(int(is_with_intermediate_sale.sum()[0]))]))
+    print(df_grouped_by_id.reset_index().loc[np.where(is_with_intermediate_sale.drop(['index'], axis=1))[0],])
+    two_sigma_fin_mod_tools = TwoSigmaFinModTools()
+    intermediate_sales = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
+    print(intermediate_sales)
 
 
     # Visualize market run over the time period
