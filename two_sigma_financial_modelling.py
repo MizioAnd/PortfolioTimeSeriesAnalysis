@@ -11,7 +11,7 @@ __author__ = 'Mizio'
 
 # Used imports
 import numpy as np
-# import pandas as pd
+import pandas as pd
 # import pylab as plt
 # from fancyimpute import MICE
 # import random
@@ -80,7 +80,12 @@ class TwoSigmaFinModTools:
             intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, amin, amax, id)
 
         # return np.array([id_for_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
-        return id_for_intermediate_trades, intermediate_trade_timestamp_of_assets
+        intermediate_trades_dataframe = pd.DataFrame()
+        intermediate_trades_dataframe['id'] = id_for_intermediate_trades
+        intermediate_trades_dataframe['amin'] = intermediate_trade_timestamp_of_assets[0:, 0]
+        intermediate_trades_dataframe['amax'] = intermediate_trade_timestamp_of_assets[0:, 1]
+        # return id_for_intermediate_trades, intermediate_trade_timestamp_of_assets
+        return intermediate_trades_dataframe
 
     def recursive_left_right_check(self, df, amin, amax, id):
         '''
@@ -285,9 +290,21 @@ def main():
     print(''.join(['Number of intermediate sold assets: ', str(int(is_with_intermediate_sale.sum()[0]))]))
     print(df_grouped_by_id.reset_index().loc[np.where(is_with_intermediate_sale.drop(['index'], axis=1))[0],])
     two_sigma_fin_mod_tools = TwoSigmaFinModTools()
-    intermediate_sales = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
-    print(intermediate_sales)
+    intermediate_sales_df = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
+    print(intermediate_sales_df)
 
+    # Modify earlier plot to include intermediate sales
+    # Plot without check on intermediate sales
+    plt.figure()
+    amin_values = np.insert(df_grouped_by_id[('timestamp', 'amin')].values, np.shape(df_grouped_by_id[('timestamp', 'amin')].values)[0], intermediate_sales_df.amin.values, axis=0)
+    amax_values = np.insert(df_grouped_by_id[('timestamp', 'amax')].values, np.shape(df_grouped_by_id[('timestamp', 'amax')].values)[0], intermediate_sales_df.amax.values, axis=0)
+    id_array = np.insert(df_grouped_by_id.id.values, np.shape(df_grouped_by_id.id.values)[0], intermediate_sales_df.id.values)
+    plt.plot(amin_values, id_array, '.', label='bought')
+    plt.plot(amax_values, id_array, '.', color='r', label='sold')
+    plt.title('With intermediate trades')
+    plt.xlabel('timestamp')
+    plt.ylabel('asset id')
+    plt.legend()
 
     # Visualize market run over the time period
     market_return_df = df[['timestamp', 'y']].groupby('timestamp').agg([np.mean, np.std, len]).reset_index()
