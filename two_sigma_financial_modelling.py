@@ -1,31 +1,34 @@
 # Model portfolio returns using time series analysis
 __author__ = 'Mizio'
 
+# Not so often used imports
 # import csv as csv
-import numpy as np
-import pandas as pd
 # import matplotlib
 # matplotlib.use('TkAgg')
-import pylab as plt
-from fancyimpute import MICE
 # import sys
 # sys.path.append('/custom/path/to/modules')
-import random
 # from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import OneHotEncoder
-from scipy.stats import skew
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.linear_model import LassoCV
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler, LabelBinarizer
-from sklearn_pandas import DataFrameMapper
-import xgboost as xgb
-from matplotlib.backends.backend_pdf import PdfPages
-import datetime
-from sklearn.cluster import FeatureAgglomeration
-import seaborn as sns
+
+# Used imports
+import numpy as np
+# import pandas as pd
+# import pylab as plt
+# from fancyimpute import MICE
+# import random
+# from sklearn.preprocessing import LabelEncoder
+# from sklearn.preprocessing import OneHotEncoder
+# from scipy.stats import skew
+# from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import KFold, train_test_split
+# from sklearn.linear_model import LassoCV
+# from sklearn.ensemble import IsolationForest
+# from sklearn.preprocessing import StandardScaler, LabelBinarizer
+# from sklearn_pandas import DataFrameMapper
+# import xgboost as xgb
+# from matplotlib.backends.backend_pdf import PdfPages
+# import datetime
+# from sklearn.cluster import FeatureAgglomeration
+# import seaborn as sns
 
 class TwoSigmaFinModTools:
     def __init__(self):
@@ -62,7 +65,7 @@ class TwoSigmaFinModTools:
         # Cut in two and check if amax is equal to length of cutted part
 
         # Assuming only one intermediate sale exists
-        intermediate_trade_timestamp_of_assets = np.zeros((1, len(timestamp_length_and_len_diffs)))
+        intermediate_trade_timestamp_of_assets = np.zeros((len(timestamp_length_and_len_diffs), 2))
         for ite in np.arange(0, len(id_for_intermediate_trades)):
             id = id_for_intermediate_trades[ite]
             # df_grouped_by_id_with_intermediate_trade = df_grouped_by_id[df.id == id]
@@ -76,7 +79,8 @@ class TwoSigmaFinModTools:
 
             intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax, id)
 
-        return np.array([id_for_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
+        # return np.array([id_for_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
+        return id_for_intermediate_trades, intermediate_trade_timestamp_of_assets
 
     def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax, id):
         '''
@@ -97,16 +101,16 @@ class TwoSigmaFinModTools:
         # Find midway timestamp of particular id
         midway_timestamp = asset_timestamps.apply(int).values[round(len(asset_timestamps.apply(int).values)/2)]
 
-        is_timestamp_diff_equal_len_left, amin_left, amax_left = self.check_timestamps_left_part(df, df_grouped_by_id,
-                                                                                                 midway_timestamp, amin,
-                                                                                                 id)
+        is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left = self.check_timestamps_left_part(df, df_grouped_by_id, midway_timestamp, amin, id)
         if is_timestamp_diff_equal_len_left.values[0]:
-            is_timestamp_diff_equal_len_right, amin_right, amax_right = \
-                self.check_timestamps_right_part(df, df_grouped_by_id, midway_timestamp, amax, id)
-            if is_timestamp_diff_equal_len_right:
-                return amax_right
+            is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right = self.check_timestamps_right_part(df, df_grouped_by_id, midway_timestamp, amax, id)
+            if lenght_right.values[0]:
+                return amin_right, amax_right
             else:
-                return self.recursive_left_right_check(df, df_grouped_by_id, amin_right, amin_right, id)
+                if lenght_left.values[0] == 2:
+                    return amin_left, amax_left
+                else:
+                    return self.recursive_left_right_check(df, df_grouped_by_id, amin_right, amax_right, id)
         else:
             return self.recursive_left_right_check(df, df_grouped_by_id, amin_left, amax_left, id)
 
@@ -119,16 +123,26 @@ class TwoSigmaFinModTools:
         :param midway_timestamps:
         :return: True if intermediate sale is in left part False otherwise.
         '''
+        # Todo : correct code as done for right part
+        df = df[df.id == id]
+        # amin_left = df_grouped_by_id[(df.timestamp >= amin.values[0])
+        #                              & (df.timestamp <= midway_timestamps)][('timestamp', 'amin')]
+        # amax_left = df_grouped_by_id[(df.timestamp >= amin.values[0])
+        #                              & (df.timestamp <= midway_timestamps)][('timestamp', 'amax')]
+        # is_timestamp_diff_equal_len_left = (amax_left- amin_left).values \
+        #                                    == (df_grouped_by_id[(df.timestamp >= amin.values[0])
+        #                                                          & (df.timestamp <= midway_timestamps)][('timestamp',
+        #                                                                                                'len')] - 1)
 
-        amin_left = df_grouped_by_id[(df.id == id) & (df.timestamp >= amin.values[0])
-                                      & (df.timestamp <= midway_timestamps)][('timestamp', 'amin')]
-        amax_left = df_grouped_by_id[(df.id == id) & (df.timestamp >= amin.values[0])
-                                      & (df.timestamp <= midway_timestamps)][('timestamp', 'amax')]
-        is_timestamp_diff_equal_len_left = (amax_left- amin_left).values \
-                                           == (df_grouped_by_id[(df.id == id) & (df.timestamp >= amin.values[0])
-                                                                 & (df.timestamp <= midway_timestamps)][('timestamp',
-                                                                                                       'len')] - 1)
-        return is_timestamp_diff_equal_len_left, amin_left, amax_left
+        df_timestamp_interval = df[(df.timestamp >= amin.values[0]) & (df.timestamp <= midway_timestamps)]
+        df_timestamp_interval_aggregated = df_timestamp_interval.groupby('id').agg([np.min, np.max, len])
+        amin_left = df_timestamp_interval_aggregated[('timestamp', 'amin')]
+        amax_left = df_timestamp_interval_aggregated[('timestamp', 'amax')]
+        lenght_left = df_timestamp_interval_aggregated[('timestamp', 'len')]
+        is_timestamp_diff_equal_len_left = (amax_left - amin_left).values \
+                                           == (lenght_left - 1)
+
+        return is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left
 
     def check_timestamps_right_part(self, df, df_grouped_by_id, midway_timestamps, amax, id):
         '''
@@ -139,43 +153,60 @@ class TwoSigmaFinModTools:
         :param midway_timestamps:
         :return: True if intermediate sale is in left part False otherwise.
         '''
+        df = df[df.id == id]
+        # amin_right = df_grouped_by_id[(df_grouped_by_id.id == id) & (df_grouped_by_id.timestamp > midway_timestamps)
+        #                               & (df_grouped_by_id.timestamp <= amax.values[0])][('timestamp', 'amin')]
+        # amin_right = df_grouped_by_id[(df.id == id) & (df.timestamp > midway_timestamps)
+        #                                & (df.timestamp <= amax.values[0])][('timestamp', 'amin')]
+        df_timestamp_interval = df[(df.timestamp > midway_timestamps) & (df.timestamp <= amax.values[0])]
+        # amin_right# [('timestamp', 'amin')]
+        df_timestamp_interval_aggregated = df_timestamp_interval.groupby('id').agg([np.min, np.max, len])
+        amin_right = df_timestamp_interval_aggregated[('timestamp', 'amin')]
+        amax_right = df_timestamp_interval_aggregated[('timestamp', 'amax')]
+        lenght_right = df_timestamp_interval_aggregated[('timestamp', 'len')]
 
-        amin_right = df_grouped_by_id[(df.id == id) & (df.timestamp > midway_timestamps)
-                                       & (df.timestamp <= amax.values[0])][('timestamp', 'amin')]
-        amax_right = df_grouped_by_id[(df.id == id) & (df.timestamp > midway_timestamps)
-                                       & (df.timestamp <= amax.values[0])][('timestamp', 'amax')]
+        # amax_right = df_grouped_by_id[(df.timestamp > midway_timestamps)
+        #                               & (df.timestamp <= amax.values[0])][('timestamp', 'amax')]
+        # is_timestamp_diff_equal_len_right = (amax_right - amin_right).values \
+        #                                     == (df_grouped_by_id[(df.timestamp > midway_timestamps)
+        #                                                          & (df.timestamp <= amax.values[0])][('timestamp', 'len')] - 1)
         is_timestamp_diff_equal_len_right = (amax_right - amin_right).values \
-                                            == (df_grouped_by_id[(df.id == id) & (df.timestamp > midway_timestamps)
-                                                                  & (df.timestamp <= amax.values[0])][('timestamp', 'len')] - 1)
-        return is_timestamp_diff_equal_len_right, amin_right, amax_right
+                                            == (lenght_right - 1)
+
+        # df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
+        # df_grouped_by_id.sort_values([('timestamp', 'amax')], inplace=True, ascending=False)
+        return is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right
 
 
 def main():
+    # Not so often used imports
     # import csv as csv
-    import numpy as np
-    import pandas as pd
     # import matplotlib
     # matplotlib.use('TkAgg')
-    import pylab as plt
-    from fancyimpute import MICE
     # import sys
     # sys.path.append('/custom/path/to/modules')
-    import random
     # from sklearn.model_selection import cross_val_score
-    from sklearn.preprocessing import LabelEncoder
-    from sklearn.preprocessing import OneHotEncoder
-    from scipy.stats import skew
-    from sklearn.model_selection import cross_val_score
-    from sklearn.model_selection import KFold, train_test_split
-    from sklearn.linear_model import LassoCV
-    from sklearn.ensemble import IsolationForest
-    from sklearn.preprocessing import StandardScaler, LabelBinarizer
-    from sklearn_pandas import DataFrameMapper
-    import xgboost as xgb
-    from matplotlib.backends.backend_pdf import PdfPages
-    import datetime
-    from sklearn.cluster import FeatureAgglomeration
+
+    # Used imports
+    import numpy as np
+    import pandas as pd
+    import pylab as plt
     import seaborn as sns
+    # from fancyimpute import MICE
+    # import random
+    # from sklearn.preprocessing import LabelEncoder
+    # from sklearn.preprocessing import OneHotEncoder
+    # from scipy.stats import skew
+    # from sklearn.model_selection import cross_val_score
+    # from sklearn.model_selection import KFold, train_test_split
+    # from sklearn.linear_model import LassoCV
+    # from sklearn.ensemble import IsolationForest
+    # from sklearn.preprocessing import StandardScaler, LabelBinarizer
+    # from sklearn_pandas import DataFrameMapper
+    # import xgboost as xgb
+    # from matplotlib.backends.backend_pdf import PdfPages
+    # import datetime
+    # from sklearn.cluster import FeatureAgglomeration
 
     pd.set_option('display.max_columns', 120)
 
