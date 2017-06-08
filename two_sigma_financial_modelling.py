@@ -293,11 +293,11 @@ def main():
     intermediate_sales_df = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
     print(intermediate_sales_df)
 
-    # Modify earlier plot to include intermediate sales
-    # Plot without check on intermediate sales
+    # Plot including intermediate sales of assets.
+    # Notice for intermediate sales assets are sold at amin and bought at amax.
     plt.figure()
-    amin_values = np.insert(df_grouped_by_id[('timestamp', 'amin')].values, np.shape(df_grouped_by_id[('timestamp', 'amin')].values)[0], intermediate_sales_df.amin.values, axis=0)
-    amax_values = np.insert(df_grouped_by_id[('timestamp', 'amax')].values, np.shape(df_grouped_by_id[('timestamp', 'amax')].values)[0], intermediate_sales_df.amax.values, axis=0)
+    amin_values = np.insert(df_grouped_by_id[('timestamp', 'amin')].values, np.shape(df_grouped_by_id[('timestamp', 'amin')].values)[0], intermediate_sales_df.amax.values, axis=0)
+    amax_values = np.insert(df_grouped_by_id[('timestamp', 'amax')].values, np.shape(df_grouped_by_id[('timestamp', 'amax')].values)[0], intermediate_sales_df.amin.values, axis=0)
     id_array = np.insert(df_grouped_by_id.id.values, np.shape(df_grouped_by_id.id.values)[0], intermediate_sales_df.id.values)
     plt.plot(amin_values, id_array, '.', label='bought')
     plt.plot(amax_values, id_array, '.', color='r', label='sold')
