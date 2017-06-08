@@ -77,12 +77,12 @@ class TwoSigmaFinModTools:
 
             # Todo: More general case: What if there are several intermediate trades?
 
-            intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, df_grouped_by_id, amin, amax, id)
+            intermediate_trade_timestamp_of_assets[ite] = self.recursive_left_right_check(df, amin, amax, id)
 
         # return np.array([id_for_intermediate_trades, intermediate_trade_timestamp_of_assets]).transpose()
         return id_for_intermediate_trades, intermediate_trade_timestamp_of_assets
 
-    def recursive_left_right_check(self, df, df_grouped_by_id, amin, amax, id):
+    def recursive_left_right_check(self, df, amin, amax, id):
         '''
         # method structure
         # 1)compute left part
@@ -101,20 +101,20 @@ class TwoSigmaFinModTools:
         # Find midway timestamp of particular id
         midway_timestamp = asset_timestamps.apply(int).values[round(len(asset_timestamps.apply(int).values)/2)]
 
-        is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left = self.check_timestamps_left_part(df, df_grouped_by_id, midway_timestamp, amin, id)
+        is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left = self.check_timestamps_left_part(df, midway_timestamp, amin, id)
         if is_timestamp_diff_equal_len_left.values[0]:
-            is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right = self.check_timestamps_right_part(df, df_grouped_by_id, midway_timestamp, amax, id)
+            is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right = self.check_timestamps_right_part(df, midway_timestamp, amax, id)
             if lenght_right.values[0]:
                 return amin_right, amax_right
             else:
                 if lenght_left.values[0] == 2:
                     return amin_left, amax_left
                 else:
-                    return self.recursive_left_right_check(df, df_grouped_by_id, amin_right, amax_right, id)
+                    return self.recursive_left_right_check(df, amin_right, amax_right, id)
         else:
-            return self.recursive_left_right_check(df, df_grouped_by_id, amin_left, amax_left, id)
+            return self.recursive_left_right_check(df, amin_left, amax_left, id)
 
-    def check_timestamps_left_part(self, df, df_grouped_by_id, midway_timestamps, amin, id):
+    def check_timestamps_left_part(self, df, midway_timestamps, amin, id):
         '''
         Check left part
 
@@ -144,7 +144,7 @@ class TwoSigmaFinModTools:
 
         return is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left
 
-    def check_timestamps_right_part(self, df, df_grouped_by_id, midway_timestamps, amax, id):
+    def check_timestamps_right_part(self, df, midway_timestamps, amax, id):
         '''
         Check right part
 
