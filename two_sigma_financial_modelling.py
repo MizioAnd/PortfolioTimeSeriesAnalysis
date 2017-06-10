@@ -252,6 +252,20 @@ def main():
     intermediate_sales_df = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
     print(intermediate_sales_df)
 
+
+    # Plot only intermediate sales of assets.
+    # Notice for intermediate sales assets are sold at amin and bought at amax.
+    plt.figure()
+    amin_values = intermediate_sales_df.amax.values
+    amax_values = intermediate_sales_df.amin.values
+    id_array = intermediate_sales_df.id.values
+    plt.plot(amin_values, id_array, '.', label='bought')
+    plt.plot(amax_values, id_array, '.', color='r', label='sold')
+    plt.title('Only intermediate trades')
+    plt.xlabel('timestamp')
+    plt.ylabel('asset id')
+    plt.legend()
+
     # Plot includes intermediate sales of assets.
     # Notice for intermediate sales assets are sold at amin and bought at amax.
     plt.figure()
