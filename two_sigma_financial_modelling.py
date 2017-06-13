@@ -107,7 +107,7 @@ class TwoSigmaFinModTools:
 
     def clean_data(self, df):
         df = df.copy()
-        is_with_MICE = 0
+        is_with_MICE = 1
         if df.isnull().sum().sum() > 0:
             if is_with_MICE:
                 # Imputation using MICE
@@ -288,7 +288,7 @@ class TwoSigmaFinModTools:
     def drop_variable(self, df):
         # df = df.drop(['Id'], axis=1)
 
-        if not any(tuple(df.columns == 'Call Outcome')):
+        if not any(tuple(df.columns == 'y')):
             # All feature var names occuring in test data is assigned the public varaible df_test_all_feature_var_names.
             self.df_test_all_feature_var_names = df.columns
         return df
@@ -303,7 +303,8 @@ class TwoSigmaFinModTools:
 
         # one-hot encoded
         # not one-hot
-        date_time = '20170613_19h09m40s'
+        # date_time = '20170613_19h09m40s'
+        date_time = '20170613_19h34m31s'
         with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.h5']), 'r') as train:
             return train.get(dataframe_name)
         # return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
@@ -317,13 +318,14 @@ class TwoSigmaFinModTools:
 
     def prepare_data_random_forest(self, df):
         df = df.copy()
-        df = self.drop_variable_before_preparation(df)
-
-        TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
-        TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
 
         TwoSigmaFinModTools._is_not_import_data = 0
         if TwoSigmaFinModTools._is_not_import_data:
+            df = self.drop_variable_before_preparation(df)
+
+            TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
+            TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
+
             self.feature_mapping_to_numerical_values(df)
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
@@ -338,6 +340,8 @@ class TwoSigmaFinModTools:
                 TwoSigmaFinModTools.is_dataframe_with_target_value = 0
         else:
             df = TwoSigmaFinModTools.load_dataframe()
+            TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
+            TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
             TwoSigmaFinModTools.is_dataframe_with_target_value = 0
 
         df = self.drop_variable(df)
