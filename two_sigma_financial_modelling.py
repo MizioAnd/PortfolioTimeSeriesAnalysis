@@ -278,7 +278,8 @@ class TwoSigmaFinModTools:
 
     def drop_variable_before_preparation(self, df):
         # Acceptable limit of NaN in features
-        limit_of_nans = 0.3*df.shape[0]
+        # limit_of_nans = 0.3*df.shape[0]
+        limit_of_nans = 0.04 * df.shape[0]
         for feature in self.features_with_missing_values_in_dataframe(df).index:
             if df[feature].isnull().sum() > limit_of_nans:
                 df = df.drop([feature], axis=1)
@@ -293,25 +294,19 @@ class TwoSigmaFinModTools:
         return df
 
     def save_dataframe(self, df):
-        if TwoSigmaFinModTools.is_dataframe_with_target_value:
-            df.to_csv(''.join([TwoSigmaFinModTools._save_path, 'train_debug', self.timestamp, '.csv']), columns=df.columns,
-                      index=False)
-        else:
-            df.to_csv(''.join([TwoSigmaFinModTools._save_path, 'test_debug', self.timestamp, '.csv']), columns=df.columns,
-                      index=False)
+        with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, 'train_debug', self.timestamp, '.h5']), "w") as train:
+            train.put("train_debug", df)
 
     @staticmethod
     def load_dataframe():
-        if TwoSigmaFinModTools.is_dataframe_with_target_value:
-            dataframe_name = 'train_debug'
-        else:
-            dataframe_name = 'test_debug'
+        dataframe_name = 'train_debug'
 
         # one-hot encoded
-        date_time = '20170429_19h00m58s'
         # not one-hot
-
-        return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
+        date_time = '20170613_19h09m40s'
+        with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.h5']), 'r') as train:
+            return train.get(dataframe_name)
+        # return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
 
     @staticmethod
     def drop_num_features(df):
@@ -327,7 +322,7 @@ class TwoSigmaFinModTools:
         TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
         TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
 
-        TwoSigmaFinModTools._is_not_import_data = 1
+        TwoSigmaFinModTools._is_not_import_data = 0
         if TwoSigmaFinModTools._is_not_import_data:
             self.feature_mapping_to_numerical_values(df)
             if TwoSigmaFinModTools._is_one_hot_encoder:
@@ -336,7 +331,7 @@ class TwoSigmaFinModTools:
             df = self.clean_data(df)
             df = self.feature_scaling(df)
 
-            is_save_dataframe = 0
+            is_save_dataframe = 1
             # Todo: change saving format to .h5 instead of csv
             if is_save_dataframe:
                 self.save_dataframe(df)
