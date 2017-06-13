@@ -541,7 +541,26 @@ class TwoSigmaFinModTools:
         is_timestamp_diff_equal_len_right = (amax_right - amin_right).values == (lenght_right - 1)
         return is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right
 
-    def predicted_vs_actual_sale_price_input_model(self, model, x_train, y_train, title_name):
+    def outlier_identification(self, model, x_train, y_train):
+        # Split the training data into an extra set of test
+        x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+        print('\nOutlier shapes')
+        print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
+        model.fit(x_train_split, y_train_split)
+        y_predicted = model.predict(x_test_split)
+        residuals = np.absolute(y_predicted - y_test_split)
+        rmse_pred_vs_actual = self.rmse(y_predicted, y_test_split)
+        outliers_mask = residuals >= rmse_pred_vs_actual
+        # outliers_mask = np.insert(np.zeros((np.shape(y_train_split)[0],), dtype=np.int), np.shape(y_train_split)[0],
+        #                           outliers_mask)
+        outliers_mask = np.concatenate([np.zeros((np.shape(y_train_split)[0],), dtype=bool), outliers_mask])
+        not_an_outlier = outliers_mask == 0
+        # Resample the training set from split, since the set was randomly split
+        x_out = np.insert(x_train_split, np.shape(x_train_split)[0], x_test_split, axis=0)
+        y_out = np.insert(y_train_split, np.shape(y_train_split)[0], y_test_split, axis=0)
+        return x_out[not_an_outlier, ], y_out[not_an_outlier, ]
+
+    def predicted_vs_actual_y_input_model(self, model, x_train, y_train, title_name):
         # Split the training data into an extra set of test
         x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
         print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
@@ -556,7 +575,7 @@ class TwoSigmaFinModTools:
         plt.plot([min(y_test_split), max(y_test_split)], [min(y_test_split), max(y_test_split)])
         plt.tight_layout()
 
-    def predicted_vs_actual_sale_price_xgb(self, xgb, best_nrounds, xgb_params, x_train, y_train, title_name):
+    def predicted_vs_actual_y_xgb(self, xgb, best_nrounds, xgb_params, x_train, y_train, title_name):
         # Split the training data into an extra set of test
         x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
         dtrain_split = xgb.DMatrix(x_train_split, label=y_train_split)
@@ -577,6 +596,15 @@ class TwoSigmaFinModTools:
         plt.ylabel('Predicted y')
         plt.plot([min(y_test_split), max(y_test_split)], [min(y_test_split), max(y_test_split)])
         plt.tight_layout()
+
+    @staticmethod
+    def multipage(filename, figs=None):
+        pp = PdfPages(filename)
+        if figs is None:
+            figs = [plt.figure(n) for n in plt.get_fignums()]
+        for fig in figs:
+            fig.savefig(pp, format='pdf')
+        pp.close()
 
 
 def main():
@@ -816,85 +844,90 @@ def main():
         print('\nShapes test data')
         print(np.shape(test_data))
 
-        # x_train = np.asarray(x_train, dtype=long)
-        # y_train = np.asarray(y_train, dtype=long)
-        # test_data = np.asarray(test_data, dtype=long)
 
-        # Regularized linear regression is needed to avoid overfitting even if you have lots of features
-        lasso = LassoCV(alphas=[0.0001, 0.0003, 0.0006, 0.001, 0.003, 0.006, 0.01, 0.03, 0.06, 0.1,
-                                0.3, 0.6, 1],
-                        max_iter=50000, cv=10)
-        # Todo: make a copy of lasso object
-        # lasso_copy = lasso
+        is_lasso = 0
+        if is_lasso:
+            # x_train = np.asarray(x_train, dtype=long)
+            # y_train = np.asarray(y_train, dtype=long)
+            # test_data = np.asarray(test_data, dtype=long)
 
-        # Exclude outliers
-        # x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
-        print('\nShape after outlier detection')
-        print(np.shape(x_train), np.shape(y_train))
+            # Regularized linear regression is needed to avoid overfitting even if you have lots of features
+            lasso = LassoCV(alphas=[0.0001, 0.0003, 0.0006, 0.001, 0.003, 0.006, 0.01, 0.03, 0.06, 0.1,
+                                    0.3, 0.6, 1],
+                            max_iter=50000, cv=10)
+            # Todo: make a copy of lasso object
+            # lasso_copy = lasso
 
-        # Feature selection with Lasso
-        # Make comparison plot using only the train data.
-        # Predicted vs. Actual Sale price
-        title_name = 'LassoCV'
-        two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_input_model(lasso, x_train, y_train, title_name)
-        plt.show()
-        lasso.fit(x_train, y_train)
-        alpha = lasso.alpha_
-        print('best LassoCV alpha:', alpha)
-        score = lasso.score(x_train, y_train)
-        output_lasso = lasso.predict(X=test_data)
-        print('\nSCORE Lasso linear model:---------------------------------------------------')
-        print(score)
+            # Exclude outliers
+            x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
+            print('\nShape after outlier detection')
+            print(np.shape(x_train), np.shape(y_train))
 
-        is_feature_selection_prediction = 0
-        if is_feature_selection_prediction:
-
-            is_feature_selection_with_lasso = 1
-            if is_feature_selection_with_lasso:
-                forest_feature_selection = lasso
-                add_name_of_regressor = 'Lasso'
-            else:
-                add_name_of_regressor = 'Random Forest'
-                # Random forest (rf) regressor for feature selection
-                forest_feature_selection = RandomForestRegressor(n_estimators=240, max_depth=8)
-                forest_feature_selection = forest_feature_selection.fit(x_train, y_train)
-
-                # Evaluate variable importance with no cross validation
-                importances = forest_feature_selection.feature_importances_
-                # std = np.std([tree.feature_importances_ for tree in forest_feature_selection.estimators_], axis=0)
-                indices = np.argsort(importances)[::-1]
-
-                print('\nFeatures:')
-                df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_test)
-                print(np.reshape(
-                      np.append(np.array(list(df_test_num_features)), np.arange(0, len(list(df_test_num_features)))),
-                      (len(list(df_test_num_features)), 2),
-                      'F'))  # , 2, len(list(df_test)))
-
-                print('\nFeature ranking:')
-                for f in range(x_train.shape[1]):
-                    print('%d. feature %d (%f)' % (f + 1, indices[f], importances[indices[f]]))
-
-            # Select most important features
-            feature_selection_model = SelectFromModel(forest_feature_selection, prefit=True)
-            x_train_new = feature_selection_model.transform(x_train)
-            print(x_train_new.shape)
-            test_data_new = feature_selection_model.transform(test_data)
-            print(test_data_new.shape)
-            # We get that 21 features are selected
-
-            title_name = ''.join([add_name_of_regressor, ' Feature Selection'])
-            # two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_input_model(forest_feature_selection, x_train_new, y_train,
-            #                                                         title_name)
-            forest_feature_selected = forest_feature_selection.fit(x_train_new, y_train)
-            score = forest_feature_selected.score(x_train_new, y_train)
-            output_feature_selection_lasso = forest_feature_selection.predict(X=test_data_new)
-            print('\nSCORE {0} regressor (feature select):---------------------------------------------------'
-                  .format(add_name_of_regressor))
+            # Feature selection with Lasso
+            # Make comparison plot using only the train data.
+            # Predicted vs. Actual Sale price
+            title_name = 'LassoCV'
+            two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(lasso, x_train, y_train, title_name)
+            # plt.show()
+            lasso.fit(x_train, y_train)
+            alpha = lasso.alpha_
+            print('best LassoCV alpha:', alpha)
+            score = lasso.score(x_train, y_train)
+            output_lasso = lasso.predict(X=test_data)
+            print('\nSCORE Lasso linear model:---------------------------------------------------')
             print(score)
 
+            is_feature_selection_prediction = 0
+            if is_feature_selection_prediction:
+
+                is_feature_selection_with_lasso = 1
+                if is_feature_selection_with_lasso:
+                    forest_feature_selection = lasso
+                    add_name_of_regressor = 'Lasso'
+                else:
+                    add_name_of_regressor = 'Random Forest'
+                    # Random forest (rf) regressor for feature selection
+                    forest_feature_selection = RandomForestRegressor(n_estimators=240, max_depth=8)
+                    forest_feature_selection = forest_feature_selection.fit(x_train, y_train)
+
+                    # Evaluate variable importance with no cross validation
+                    importances = forest_feature_selection.feature_importances_
+                    # std = np.std([tree.feature_importances_ for tree in forest_feature_selection.estimators_], axis=0)
+                    indices = np.argsort(importances)[::-1]
+
+                    print('\nFeatures:')
+                    df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_test)
+                    print(np.reshape(
+                          np.append(np.array(list(df_test_num_features)), np.arange(0, len(list(df_test_num_features)))),
+                          (len(list(df_test_num_features)), 2),
+                          'F'))  # , 2, len(list(df_test)))
+
+                    print('\nFeature ranking:')
+                    for f in range(x_train.shape[1]):
+                        print('%d. feature %d (%f)' % (f + 1, indices[f], importances[indices[f]]))
+
+                # Select most important features
+                feature_selection_model = SelectFromModel(forest_feature_selection, prefit=True)
+                # Todo: fix below method that returns empty array
+                x_train_new = feature_selection_model.transform(x_train)
+                print(x_train_new.shape)
+                test_data_new = feature_selection_model.transform(test_data)
+                print(test_data_new.shape)
+                # We get that 21 features are selected
+
+                title_name = ''.join([add_name_of_regressor, ' Feature Selection'])
+                two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(forest_feature_selection, x_train_new, y_train,
+                                                                        title_name)
+                # plt.show()
+                forest_feature_selected = forest_feature_selection.fit(x_train_new, y_train)
+                score = forest_feature_selected.score(x_train_new, y_train)
+                output_feature_selection_lasso = forest_feature_selection.predict(X=test_data_new)
+                print('\nSCORE {0} regressor (feature select):---------------------------------------------------'
+                      .format(add_name_of_regressor))
+                print(score)
+
         ''' xgboost '''
-        is_xgb_cv = 0
+        is_xgb_cv = 1
         if is_xgb_cv:
             seed = 0
             dtrain = xgb.DMatrix(x_train, label=y_train)
@@ -914,8 +947,8 @@ def main():
                 'eval_metric': 'rmse',
             }
 
-            res = xgb.cv(xgb_params, dtrain, num_boost_round=10000, nfold=10, seed=seed, stratified=False,
-                         early_stopping_rounds=100, verbose_eval=10, show_stdv=True)
+            res = xgb.cv(xgb_params, dtrain, num_boost_round=1000, nfold=5, seed=seed, stratified=False,
+                         early_stopping_rounds=10, verbose_eval=10, show_stdv=True)
 
             best_nrounds = res.shape[0] - 1
             cv_mean = res.iloc[-1, 0]
@@ -923,17 +956,23 @@ def main():
 
             print('Ensemble-CV: {0}+{1}'.format(cv_mean, cv_std))
             title_name = 'xgb.cv'
-            # two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_xgb(xgb, best_nrounds, xgb_params, x_train, y_train,
-            #                                                 title_name)
+            two_sigma_fin_mod_tools.predicted_vs_actual_y_xgb(xgb, best_nrounds, xgb_params, x_train, y_train,
+                                                            title_name)
+            # plt.show()
             gbdt = xgb.train(xgb_params, dtrain, best_nrounds)
             output_xgb_cv = gbdt.predict(dtest)
 
         # Averaging the output using four different machine learning estimators
         # output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
-        output = output_lasso
+        # output = output_lasso
+        # output = output_feature_selection_lasso
+        output = output_xgb_cv
 
-    not_save = 1
-    if (is_make_a_prediction & not_save):
+        save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
+        two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', two_sigma_fin_mod_tools.timestamp, '.pdf']))
+        plt.show()
+
+    if is_make_a_prediction:
         ''' Submission '''
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/submission/'
 
@@ -943,7 +982,9 @@ def main():
 
         submission = pd.DataFrame({'id': Id_df_test, 'y': output})
         # Todo: submission should also be in .h5 format and csv
-        submission.to_csv(''.join([save_path, 'submission_two_sigma_fin_mod_tools_', two_sigma_fin_mod_tools.timestamp, '.csv']), index=False)
+        # submission.to_csv(''.join([save_path, 'submission_two_sigma_fin_mod_tools_', two_sigma_fin_mod_tools.timestamp, '.csv']), index=False)
+        with pd.HDFStore(''.join([save_path, 'submission_two_sigma_fin_mod_tools_', two_sigma_fin_mod_tools.timestamp, '.h5']), 'w') as submit:
+            submit.put('submission_two_sigma_fin_mod_tools', submission)
         print(two_sigma_fin_mod_tools.timestamp)
 
 
