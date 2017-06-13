@@ -12,23 +12,23 @@ __author__ = 'Mizio'
 # Used imports
 import numpy as np
 import pandas as pd
-# import pylab as plt
-# from fancyimpute import MICE
-# import random
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.preprocessing import OneHotEncoder
-# from scipy.stats import skew
-# from sklearn.model_selection import cross_val_score
-# from sklearn.model_selection import KFold, train_test_split
-# from sklearn.linear_model import LassoCV
-# from sklearn.ensemble import IsolationForest
-# from sklearn.preprocessing import StandardScaler, LabelBinarizer
-# from sklearn_pandas import DataFrameMapper
-# import xgboost as xgb
-# from matplotlib.backends.backend_pdf import PdfPages
+import pylab as plt
+from fancyimpute import MICE
+import random
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+from scipy.stats import skew
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold, train_test_split
+from sklearn.linear_model import LassoCV
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler, LabelBinarizer
+from sklearn_pandas import DataFrameMapper
+import xgboost as xgb
+from matplotlib.backends.backend_pdf import PdfPages
 import datetime
-# from sklearn.cluster import FeatureAgglomeration
-# import seaborn as sns
+from sklearn.cluster import FeatureAgglomeration
+import seaborn as sns
 
 class TwoSigmaFinModTools:
     def __init__(self):
@@ -56,11 +56,383 @@ class TwoSigmaFinModTools:
     with pd.HDFStore("/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/input/train.h5", "r") as train:
         df = train.get("train")
 
-    # hack df_test is pointing to df and is used in all class functions
-    # Todo: make correct partition for validation data
-    df_test = df
+    # Todo: consider moving partition for validation data from main() to this point
+    df_test = []
 
-    # Todo: insert methods used for preparation of data
+    @staticmethod
+    def square_feet_to_meters(area):
+        square_meter_per_square_feet = 0.3048**2
+        return area*square_meter_per_square_feet
+
+    # @staticmethod
+    # def extract_numerical_features(df):
+    #     df = df.copy()
+    #     # Identify numerical columns which are of type object
+    #     numerical_features = pd.Series(data=False, index=df.columns, dtype=bool)
+    #
+    #     for feature in df.columns:
+    #         if any(tuple(df[feature].apply(lambda x: type(x)) == int)) or \
+    #                         any(tuple(df[feature].apply(lambda x: type(x)) == float)) & \
+    #                         (not any(tuple(df[feature].apply(lambda x: type(x)) == str))):
+    #             numerical_features[feature] = 1
+    #     return numerical_features[numerical_features == 1].index
+
+    @staticmethod
+    def extract_numerical_features(df):
+        df = df.copy()
+        df = df.copy()
+        # Todo: exclude the hidden numerical types
+        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(df) == 0)]
+        # return df.select_dtypes(exclude=[[np.number, np.int]])
+        return non_numerical_feature_names
+
+    @staticmethod
+    def extract_non_numerical_features(df):
+        df = df.copy()
+        # Todo: exclude the hidden numerical types
+        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(df))]
+        # return df.select_dtypes(exclude=[[np.number, np.int]])
+        return non_numerical_feature_names
+
+    @staticmethod
+    def numerical_feature_logical_incl_hidden_num(df):
+        logical_of_non_numeric_features = np.zeros(df.columns.shape[0], dtype=int)
+        for ite in np.arange(0, df.columns.shape[0]):
+            try:
+                str(df[df.columns[ite]][0]) + df[df.columns[ite]][0]
+                logical_of_non_numeric_features[ite] = True
+            except TypeError:
+                print('Oops')
+        return logical_of_non_numeric_features
+
+    def clean_data(self, df):
+        df = df.copy()
+        is_with_MICE = 1
+        if df.isnull().sum().sum() > 0:
+            if is_with_MICE:
+                # Imputation using MICE
+                numerical_features_names = self.extract_numerical_features(df)
+                df.loc[:, tuple(numerical_features_names)] = self.estimate_by_mice(df[numerical_features_names])
+            else:
+                if any(tuple(df.columns == 'y')):
+                    df = df.dropna()
+                else:
+                    df = df.dropna(1)
+                    TwoSigmaFinModTools._feature_names_num = pd.Series(data=np.intersect1d(TwoSigmaFinModTools._feature_names_num
+                                                                                   .values, df.columns), dtype=object)
+        return df
+
+    @staticmethod
+    def encode_labels_in_numeric_format(df, estimated_var):
+        # Transform non-numeric labels into numerical values
+        # Cons.: gives additional unwanted structure to data, since some values are high and others low, despite labels
+        # where no such comparing measure exists.
+        # Alternative: use one-hot-encoding giving all labels their own column represented with only binary values.
+        feature_name_num = ''.join([estimated_var, 'Num'])
+        mask = ~df[estimated_var].isnull()
+        df[feature_name_num] = df[estimated_var]
+        df.loc[mask, tuple([feature_name_num])] = np.reshape(df[estimated_var].factorize()[0][mask[mask == 1].index], (df.shape[0], 1))
+
+    @staticmethod
+    def label_classes(df, estimated_var):
+        le = LabelEncoder()
+        le.fit(df[estimated_var].values)
+        return le.classes_
+
+    @staticmethod
+    def one_hot_encoder(df, estimated_var):
+        df_class = df.copy()
+        ohe = OneHotEncoder()
+        label_classes = df_class[estimated_var].factorize()[1]
+        new_one_hot_encoded_features = [''.join([estimated_var, '_', x]) for x in label_classes]
+        mask = ~df[estimated_var].isnull()
+        feature_var_values = ohe.fit_transform(np.reshape(np.array(df[''.join([estimated_var, 'Num'])][mask].values),
+                                                          (df[mask].shape[0], 1))).toarray().astype(int)
+        # Create new feature_var columns with one-hot encoded values
+        for ite in new_one_hot_encoded_features:
+            df[ite] = df[estimated_var]
+        df.loc[mask, tuple(new_one_hot_encoded_features)] = feature_var_values
+
+    @staticmethod
+    def add_feature_var_name_with_zeros(df, feature_var_name):
+        df[feature_var_name] = np.zeros((df.shape[0], 1), dtype=int)
+        pass
+
+    @staticmethod
+    def feature_var_names_in_training_set_not_in_test_set(feature_var_names_training, feature_var_names_test):
+        feature_var_name_addition_list = []
+        for feature_var_name in feature_var_names_training:
+            if not any(tuple(feature_var_name == feature_var_names_test)):
+                feature_var_name_addition_list.append(feature_var_name)
+        return np.array(feature_var_name_addition_list)
+
+    def feature_mapping_to_numerical_values(self, df):
+        TwoSigmaFinModTools._is_one_hot_encoder = 0
+        mask = ~df.isnull()
+        # Assume that training set has all possible feature_var_names
+        # Although it may occur in real life that a training set may hold a feature_var_name. But it is probably
+        # avoided since such features cannot
+        # be part of the trained learning algo.
+        # Add missing feature_var_names of traning set not occuring in test set. Add these with zeros in columns.
+        if not any(tuple(df.columns == 'y')):
+            # All one-hot encoded feature var names occuring in test data is assigned the private public varaible
+            # df_test_all_feature_var_names.
+            self.df_test_all_feature_var_names = df.columns
+
+        _feature_names_num = np.zeros((TwoSigmaFinModTools._non_numerical_feature_names.shape[0],), dtype=object)
+        ith = 0
+        for feature_name in TwoSigmaFinModTools._non_numerical_feature_names:
+            # Create a feature_nameNum list
+            feature_name_num = ''.join([feature_name, 'Num'])
+            _feature_names_num[ith] = feature_name_num
+            ith += 1
+            TwoSigmaFinModTools.encode_labels_in_numeric_format(df, feature_name)
+
+            if TwoSigmaFinModTools._is_one_hot_encoder:
+                is_with_label_binarizer = 0
+                if is_with_label_binarizer:
+                    mapper_df = DataFrameMapper([(feature_name, LabelBinarizer())], df_out=True)
+                    feature_var_values = mapper_df.fit_transform(df.copy())
+                    print(df[feature_name].isnull().sum().sum())
+                    print(df[feature_name][mask[feature_name]].isnull().sum().sum())
+                    for ite in feature_var_values.columns:
+                        df[ite] = feature_var_values[ite]
+                else:
+                    TwoSigmaFinModTools.one_hot_encoder(df, feature_name)
+        TwoSigmaFinModTools._feature_names_num = pd.Series(data=_feature_names_num, dtype=object)
+
+    @staticmethod
+    def feature_agglomeration(df, number_of_clusters=int(df.shape[1] / 1.2)):
+        df = df.copy()
+        # Todo: find optimal number of clusters for the feature clustering
+        # number_of_clusters = int(df.shape[1]/2)
+
+        agglomerated_features = FeatureAgglomeration(n_clusters=number_of_clusters)
+        if any(tuple(df.columns == 'Call Outcome')):
+            res = agglomerated_features.fit_transform(np.reshape(np.array(df.dropna().values), df.dropna()
+                                                                 .shape), y=df['Call Outcome'].values)
+        else:
+            res = agglomerated_features.fit_transform(np.reshape(np.array(df.values), df.shape))
+        df = pd.DataFrame(data=res)
+        return df
+
+    @staticmethod
+    def dendrogram(df, number_of_clusters=int(df.shape[1] / 1.2)):
+        # Create Dendrogram
+        agglomerated_features = FeatureAgglomeration(n_clusters=number_of_clusters)
+        used_networks = np.arange(0, number_of_clusters, dtype=int)
+
+        # Create a custom palette to identify the networks
+        network_pal = sns.cubehelix_palette(len(used_networks),
+                                            light=.9, dark=.1, reverse=True,
+                                            start=1, rot=-2)
+        network_lut = dict(zip(map(str, df.columns), network_pal))
+
+        # Convert the palette to vectors that will be drawn on the side of the matrix
+        networks = df.columns.get_level_values(None)
+        network_colors = pd.Series(networks, index=df.columns).map(network_lut)
+        sns.set(font="monospace")
+        # Create custom colormap
+        cmap = sns.diverging_palette(h_neg=210, h_pos=350, s=90, l=30, as_cmap=True)
+        cg = sns.clustermap(df.astype(float).corr(), cmap=cmap, linewidths=.5, row_colors=network_colors,
+                            col_colors=network_colors)
+        plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
+        plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), rotation=90)
+        plt.show()
+
+
+    def feature_engineering(self, df):
+        is_skewness_correction_for_all_features = 1
+        if is_skewness_correction_for_all_features:
+            # Correcting for skewness
+            # Treat all numerical variables that were not one-hot encoded
+            if any(tuple(df.columns == 'y')):
+                self.is_with_log1p_call_outcome = 1
+
+            numerical_feature_names_of_non_modified_df = TwoSigmaFinModTools._numerical_feature_names
+
+            if TwoSigmaFinModTools._is_one_hot_encoder:
+                numerical_feature_names_of_non_modified_df = numerical_feature_names_of_non_modified_df.values
+            else:
+                numerical_feature_names_of_non_modified_df = np.concatenate([TwoSigmaFinModTools._feature_names_num.values,
+                                                                             numerical_feature_names_of_non_modified_df
+                                                                            .values])
+
+            relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                (df[numerical_feature_names_of_non_modified_df].columns != 'Id')]
+            self.skew_correction(df, relevant_features)
+        else:
+            # Only scale down Call Outcome, since all leave other numerical features standardized.
+            if any(tuple(df.columns == 'Call Outcome')):
+                self.is_with_log1p_call_outcome = 1
+                df.loc[:, tuple(['Call Outcome'])] = np.log1p(df['Call Outcome'])
+
+    @staticmethod
+    def skew_correction(df, numerical_features):
+        # Skew correction
+        skewed_feats = df[numerical_features].apply(lambda x: skew(x.dropna()))  # compute skewness
+        skewed_feats = skewed_feats[skewed_feats > 0.75]
+        skewed_feats = skewed_feats.index
+        df.loc[:, tuple(skewed_feats)] = np.log1p(np.asarray(df[skewed_feats], dtype=float))
+
+    def drop_variable_before_preparation(self, df):
+        # Acceptable limit of NaN in features
+        limit_of_nans = 0.3*df.shape[0]
+        for feature in self.features_with_missing_values_in_dataframe(df).index:
+            if df[feature].isnull().sum() > limit_of_nans:
+                df = df.drop([feature], axis=1)
+        return df
+
+    def drop_variable(self, df):
+        # df = df.drop(['Id'], axis=1)
+
+        if not any(tuple(df.columns == 'Call Outcome')):
+            # All feature var names occuring in test data is assigned the public varaible df_test_all_feature_var_names.
+            self.df_test_all_feature_var_names = df.columns
+        return df
+
+    def save_dataframe(self, df):
+        if TwoSigmaFinModTools.is_dataframe_with_target_value:
+            df.to_csv(''.join([TwoSigmaFinModTools._save_path, 'train_debug', self.timestamp, '.csv']), columns=df.columns,
+                      index=False)
+        else:
+            df.to_csv(''.join([TwoSigmaFinModTools._save_path, 'test_debug', self.timestamp, '.csv']), columns=df.columns,
+                      index=False)
+
+    @staticmethod
+    def load_dataframe():
+        if TwoSigmaFinModTools.is_dataframe_with_target_value:
+            dataframe_name = 'train_debug'
+        else:
+            dataframe_name = 'test_debug'
+
+        # one-hot encoded
+        date_time = '20170429_19h00m58s'
+        # not one-hot
+
+        return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
+
+    @staticmethod
+    def drop_num_features(df):
+        # Drop all categorical feature helping columns ('Num')
+        for feature_name in TwoSigmaFinModTools._feature_names_num:
+            df = df.drop([feature_name], axis=1)
+        return df
+
+    def prepare_data_random_forest(self, df):
+        df = df.copy()
+        df = self.drop_variable_before_preparation(df)
+
+        TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
+        TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
+
+        TwoSigmaFinModTools._is_not_import_data = 1
+        if TwoSigmaFinModTools._is_not_import_data:
+            self.feature_mapping_to_numerical_values(df)
+            if TwoSigmaFinModTools._is_one_hot_encoder:
+                df = TwoSigmaFinModTools.drop_num_features(df)
+            self.feature_engineering(df)
+            # df = self.clean_data(df)
+            # df = self.feature_scaling(df)
+
+            is_save_dataframe = 0
+            # Todo: change saving format to .h5 instead of csv
+            if is_save_dataframe:
+                self.save_dataframe(df)
+                TwoSigmaFinModTools.is_dataframe_with_target_value = 0
+        else:
+            df = TwoSigmaFinModTools.load_dataframe()
+            TwoSigmaFinModTools.is_dataframe_with_target_value = 0
+
+        df = self.drop_variable(df)
+        return df
+
+    @staticmethod
+    def features_with_null_logical(df, axis=1):
+        row_length = len(df._get_axis(0))
+        # Axis to count non null values in. aggregate_axis=0 implies counting for every feature
+        aggregate_axis = 1 - axis
+        features_non_null_series = df.count(axis=aggregate_axis)
+        # Whenever count() differs from row_length it implies a null value exists in feature column and a False in mask
+        mask = row_length == features_non_null_series
+        return mask
+
+    @staticmethod
+    def estimate_by_mice(df):
+        df_estimated_var = df.copy()
+        random.seed(129)
+        mice = MICE()  # model=RandomForestClassifier(n_estimators=100))
+        res = mice.complete(np.asarray(df.values, dtype=float))
+        df_estimated_var.loc[:, df.columns] = res[:][:]
+        return df_estimated_var
+
+    def feature_scaling(self, df):
+        df = df.copy()
+        # Standardization (centering and scaling) of dataset that removes mean and scales to unit variance
+        standard_scaler = StandardScaler()
+        numerical_feature_names_of_non_modified_df = TwoSigmaFinModTools._numerical_feature_names
+        if any(tuple(df.columns == 'y')):
+            if not TwoSigmaFinModTools._is_one_hot_encoder:
+                numerical_feature_names_of_non_modified_df = np.concatenate(
+                    [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
+            # Include scaling of Call Outcome
+            y = df['Call Outcome'].values
+            relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                (df[numerical_feature_names_of_non_modified_df].columns != 'Call Outcome')
+                & (df[numerical_feature_names_of_non_modified_df].columns != 'Id')]
+            mask = ~df[relevant_features].isnull()
+            res = standard_scaler.fit_transform(X=df[relevant_features][mask].values, y=y)
+            if (~mask).sum().sum() > 0:
+                df = self.standardize_relevant_features(df, relevant_features, res)
+            else:
+                df.loc[:, tuple(relevant_features)] = res
+        else:
+            if not TwoSigmaFinModTools._is_one_hot_encoder:
+                numerical_feature_names_of_non_modified_df = np.concatenate(
+                    [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
+
+            relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
+            mask = ~df[relevant_features].isnull()
+            res = standard_scaler.fit_transform(df[relevant_features][mask].values)
+            if mask.sum().sum() > 0:
+                df = self.standardize_relevant_features(df, relevant_features, res)
+            else:
+                df.loc[:, tuple(relevant_features)] = res
+        return df
+
+    @staticmethod
+    def standardize_relevant_features(df, relevant_features, res):
+        i_column = 0
+        for feature in relevant_features:
+            mask = ~df[feature].isnull()
+            mask_index = mask[mask == 1].index
+            df.loc[mask_index, tuple([feature])] = res[:, i_column, None]
+            i_column += 1
+        return df
+
+    def missing_values_in_dataframe(self, df):
+        mask = self.features_with_null_logical(df)
+        print(df[mask[mask == 0].index.values].isnull().sum())
+        print('\n')
+
+    def features_with_missing_values_in_dataframe(self, df):
+        df = df.copy()
+        mask = self.features_with_null_logical(df)
+        return df[mask[mask == 0].index.values].isnull().sum()
+
+    @staticmethod
+    def rmse_cv(model, x_train, y_train):
+        rmse = np.sqrt(-cross_val_score(model, x_train, y_train, scoring='neg_mean_squared_error', cv=5))
+        return rmse
+
+    @staticmethod
+    def rmse(y_pred, y_actual):
+        n_samples = np.shape(y_pred)[0]
+        squared_residuals_summed = 0.5*sum((y_pred - y_actual)**2)
+        return np.sqrt(2.0*squared_residuals_summed/n_samples)
+
+
 
     def assets_with_intermediate_sales(self, df, is_with_intermediate_sale):
         df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
@@ -206,9 +578,15 @@ def main():
     two_sigma_fin_mod_tools = TwoSigmaFinModTools()
     df = two_sigma_fin_mod_tools.df.copy()
     # Todo: do partioning. train_test_split() has default 25% size for test data
-    x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
-    df_train = two_sigma_fin_mod_tools.df.copy()
-    df_test = two_sigma_fin_mod_tools.df.copy()
+    # x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+    # Generate random sequence from 0 to shape[0] of df
+    indices_shuffled = np.arange(df.shape[0])
+    np.random.shuffle(indices_shuffled)
+    length_of_75_percent = round(0.75*df.shape[0])
+    indices_75_percent = indices_shuffled[:length_of_75_percent]
+    indices_25_percent = indices_shuffled[length_of_75_percent:]
+    df_train = two_sigma_fin_mod_tools.df.copy().loc[indices_75_percent, ]
+    df_test = two_sigma_fin_mod_tools.df.copy().loc[indices_25_percent, ]
     Id_df_test = df_test.id
 
     is_explore_data = 0
@@ -357,7 +735,9 @@ def main():
         # Todo: implement ratio 20% test/validation data and 80 % training data with random partion
         # Look at code for the outliers where a partition is used
 
-        df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_train[df_train.columns[df_train.columns != 'y']].values, df_test.values)), columns=df_test.columns)
+        df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_train[df_train.columns[df_train.columns != 'y']].values,
+                                                                     df_test[df_test.columns[df_test.columns != 'y']].values)),
+                                                columns=df_test.columns[df_test.columns != 'y'])
 
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
 
@@ -377,8 +757,11 @@ def main():
         else:
             train_data = np.concatenate(
                 (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
-                 np.reshape(df_train.Target.values, (df_train.shape[0], 1))), axis=1)
-            test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
+                 np.reshape(df_train.y.values, (df_train.shape[0], 1))), axis=1)
+            # test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
+            test_data = np.concatenate(
+                (df_merged_train_and_test[df_test_num_features].values[:df_test.shape[0]],
+                 np.reshape(df_test.y.values, (df_test.shape[0], 1))), axis=1)
 
         # missing_values
         print('All df set missing values')
