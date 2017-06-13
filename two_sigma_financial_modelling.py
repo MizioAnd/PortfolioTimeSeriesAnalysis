@@ -107,7 +107,7 @@ class TwoSigmaFinModTools:
 
     def clean_data(self, df):
         df = df.copy()
-        is_with_MICE = 1
+        is_with_MICE = 0
         if df.isnull().sum().sum() > 0:
             if is_with_MICE:
                 # Imputation using MICE
@@ -120,6 +120,7 @@ class TwoSigmaFinModTools:
                     df = df.dropna(1)
                     TwoSigmaFinModTools._feature_names_num = pd.Series(data=np.intersect1d(TwoSigmaFinModTools._feature_names_num
                                                                                    .values, df.columns), dtype=object)
+        TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
         return df
 
     @staticmethod
@@ -332,8 +333,8 @@ class TwoSigmaFinModTools:
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
             self.feature_engineering(df)
-            # df = self.clean_data(df)
-            # df = self.feature_scaling(df)
+            df = self.clean_data(df)
+            df = self.feature_scaling(df)
 
             is_save_dataframe = 0
             # Todo: change saving format to .h5 instead of csv
@@ -376,10 +377,10 @@ class TwoSigmaFinModTools:
                 numerical_feature_names_of_non_modified_df = np.concatenate(
                     [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
             # Include scaling of Call Outcome
-            y = df['Call Outcome'].values
+            y = df['y'].values
             relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
-                (df[numerical_feature_names_of_non_modified_df].columns != 'Call Outcome')
-                & (df[numerical_feature_names_of_non_modified_df].columns != 'Id')]
+                (df[numerical_feature_names_of_non_modified_df].columns != 'y')
+                & (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
             mask = ~df[relevant_features].isnull()
             res = standard_scaler.fit_transform(X=df[relevant_features][mask].values, y=y)
             if (~mask).sum().sum() > 0:
@@ -540,6 +541,43 @@ class TwoSigmaFinModTools:
         lenght_right = df_timestamp_interval_aggregated[('timestamp', 'len')]
         is_timestamp_diff_equal_len_right = (amax_right - amin_right).values == (lenght_right - 1)
         return is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right
+
+    def predicted_vs_actual_sale_price_input_model(self, model, x_train, y_train, title_name):
+        # Split the training data into an extra set of test
+        x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+        print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
+        model.fit(x_train_split, y_train_split)
+        y_predicted = model.predict(x_test_split)
+        plt.figure(figsize=(10, 5))
+        plt.scatter(y_test_split, y_predicted, s=20)
+        rmse_pred_vs_actual = self.rmse(y_predicted, y_test_split)
+        plt.title(''.join([title_name, ', Predicted vs. Actual.', ' rmse = ', str(rmse_pred_vs_actual)]))
+        plt.xlabel('Actual y')
+        plt.ylabel('Predicted y')
+        plt.plot([min(y_test_split), max(y_test_split)], [min(y_test_split), max(y_test_split)])
+        plt.tight_layout()
+
+    def predicted_vs_actual_sale_price_xgb(self, xgb, best_nrounds, xgb_params, x_train, y_train, title_name):
+        # Split the training data into an extra set of test
+        x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+        dtrain_split = xgb.DMatrix(x_train_split, label=y_train_split)
+        dtest_split = xgb.DMatrix(x_test_split)
+
+        # res = xgb.cv(xgb_params, dtrain_split, num_boost_round=1000, nfold=4, seed=seed, stratified=False,
+        #              early_stopping_rounds=25, verbose_eval=10, show_stdv=True)
+        #
+        # best_nrounds = res.shape[0] - 1
+        print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
+        gbdt = xgb.train(xgb_params, dtrain_split, best_nrounds)
+        y_predicted = gbdt.predict(dtest_split)
+        plt.figure(figsize=(10, 5))
+        plt.scatter(y_test_split, y_predicted, s=20)
+        rmse_pred_vs_actual = self.rmse(y_predicted, y_test_split)
+        plt.title(''.join([title_name, ', Predicted vs. Actual.', ' rmse = ', str(rmse_pred_vs_actual)]))
+        plt.xlabel('Actual y')
+        plt.ylabel('Predicted y')
+        plt.plot([min(y_test_split), max(y_test_split)], [min(y_test_split), max(y_test_split)])
+        plt.tight_layout()
 
 
 def main():
@@ -727,8 +765,6 @@ def main():
     ''' Prepare data '''
     is_prepare_data = 1
     if is_prepare_data:
-        pass
-
         # Train model with xgboost as binary classification problem
         # change indices of data frame to run from 0 to end
 
@@ -768,20 +804,14 @@ def main():
         two_sigma_fin_mod_tools.missing_values_in_dataframe(df)
 
     # Todo: correct methods below to handle two_sigma data
-    is_make_a_prediction = 0
+    is_make_a_prediction = 1
     if is_make_a_prediction:
         ''' XGBoost and Regularized Linear Models and Random Forest '''
         print("\nPrediction Stats:")
         x_train = train_data[0::, :-1]
         y_train = train_data[0::, -1]
-        print('\nShapes train data')
-        print(np.shape(x_train), np.shape(y_train))
-        print('\nShapes test data')
-        print(np.shape(test_data))
-
-        print("\nPrediction Stats:")
-        x_train = train_data[0::, :-1]
-        y_train = train_data[0::, -1]
+        y_test_data = test_data[0::, -1]
+        test_data = test_data[0::, :-1]
         print('\nShapes train data')
         print(np.shape(x_train), np.shape(y_train))
         print('\nShapes test data')
@@ -799,7 +829,7 @@ def main():
         # lasso_copy = lasso
 
         # Exclude outliers
-        x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
+        # x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
         print('\nShape after outlier detection')
         print(np.shape(x_train), np.shape(y_train))
 
@@ -808,7 +838,7 @@ def main():
         # Predicted vs. Actual Sale price
         title_name = 'LassoCV'
         two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_input_model(lasso, x_train, y_train, title_name)
-        # plt.show()
+        plt.show()
         lasso.fit(x_train, y_train)
         alpha = lasso.alpha_
         print('best LassoCV alpha:', alpha)
@@ -817,7 +847,7 @@ def main():
         print('\nSCORE Lasso linear model:---------------------------------------------------')
         print(score)
 
-        is_feature_selection_prediction = 1
+        is_feature_selection_prediction = 0
         if is_feature_selection_prediction:
 
             is_feature_selection_with_lasso = 1
@@ -855,8 +885,8 @@ def main():
             # We get that 21 features are selected
 
             title_name = ''.join([add_name_of_regressor, ' Feature Selection'])
-            two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_input_model(forest_feature_selection, x_train_new, y_train,
-                                                                    title_name)
+            # two_sigma_fin_mod_tools.predicted_vs_actual_sale_price_input_model(forest_feature_selection, x_train_new, y_train,
+            #                                                         title_name)
             forest_feature_selected = forest_feature_selection.fit(x_train_new, y_train)
             score = forest_feature_selected.score(x_train_new, y_train)
             output_feature_selection_lasso = forest_feature_selection.predict(X=test_data_new)
@@ -865,7 +895,7 @@ def main():
             print(score)
 
         ''' xgboost '''
-        is_xgb_cv = 1
+        is_xgb_cv = 0
         if is_xgb_cv:
             seed = 0
             dtrain = xgb.DMatrix(x_train, label=y_train)
@@ -900,15 +930,17 @@ def main():
             output_xgb_cv = gbdt.predict(dtest)
 
         # Averaging the output using four different machine learning estimators
-        output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
+        # output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
+        output = output_lasso
 
-    if is_make_a_prediction:
+    not_save = 1
+    if (is_make_a_prediction & not_save):
         ''' Submission '''
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/submission/'
 
         # Exp() is needed in order to get the correct target value, since we took a log() earlier
-        if two_sigma_fin_mod_tools.is_with_log1p_SalePrice:
-            output = np.expm1(output)
+        # if two_sigma_fin_mod_tools.is_with_log1p_SalePrice:
+        #     output = np.expm1(output)
 
         submission = pd.DataFrame({'id': Id_df_test, 'y': output})
         # Todo: submission should also be in .h5 format and csv
