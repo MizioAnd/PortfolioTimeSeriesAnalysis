@@ -31,7 +31,8 @@ from sklearn.cluster import FeatureAgglomeration
 import seaborn as sns
 
 class TwoSigmaFinModTools:
-    def __init__(self):
+    def __init__(self, is_portfolio_predictions=0):
+        self.is_portfolio_predictions = is_portfolio_predictions
         self.df = TwoSigmaFinModTools.df
         # self.df_test = TwoSigmaFinModTools.df_test
         self.df_all_feature_var_names = []
@@ -91,9 +92,8 @@ class TwoSigmaFinModTools:
                 print('Oops')
         return logical_of_non_numeric_features
 
-    def clean_data(self, df):
+    def clean_data(self, df, is_with_MICE=0):
         df = df.copy()
-        is_with_MICE = 1
         if df.isnull().sum().sum() > 0:
             if is_with_MICE:
                 # Imputation using MICE
@@ -262,12 +262,10 @@ class TwoSigmaFinModTools:
         skewed_feats = skewed_feats.index
         df.loc[:, tuple(skewed_feats)] = np.log1p(np.asarray(df[skewed_feats], dtype=float))
 
-    def drop_variable_before_preparation(self, df):
+    def drop_variable_before_preparation(self, df, limit_of_nans):
         # Acceptable limit of NaN in features
-        limit_of_nans = 0.3*df.shape[0]
-        # limit_of_nans = 0.04 * df.shape[0]
         for feature in self.features_with_missing_values_in_dataframe(df).index:
-            if df[feature].isnull().sum() > limit_of_nans:
+            if df[feature].isnull().sum() > limit_of_nans*df.shape[0]:
                 df = df.drop([feature], axis=1)
         return df
 
@@ -302,12 +300,20 @@ class TwoSigmaFinModTools:
             df = df.drop([feature_name], axis=1)
         return df
 
+    def transform_data_to_portfolio(self, df):
+        # The mean of a portfolio corresponds to the return.
+        # A way to easier model the mean is to fit the cumulative mean instead.
+        return df.groupby('timestamp').agg([np.mean]).reset_index()
+
     def prepare_data(self, df):
         df = df.copy()
 
-        TwoSigmaFinModTools._is_not_import_data = 0
+        TwoSigmaFinModTools._is_not_import_data = 1
         if TwoSigmaFinModTools._is_not_import_data:
-            df = self.drop_variable_before_preparation(df)
+            if self.is_portfolio_predictions:
+                df = self.transform_data_to_portfolio(df)
+
+            df = self.drop_variable_before_preparation(df, limit_of_nans=0.04)
 
             TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
             TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
@@ -316,7 +322,7 @@ class TwoSigmaFinModTools:
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
             self.feature_engineering(df)
-            df = self.clean_data(df)
+            df = self.clean_data(df, is_with_MICE=0)
             df = self.feature_scaling(df)
 
             is_save_dataframe = 1
@@ -416,8 +422,6 @@ class TwoSigmaFinModTools:
         n_samples = np.shape(y_pred)[0]
         squared_residuals_summed = 0.5*sum((y_pred - y_actual)**2)
         return np.sqrt(2.0*squared_residuals_summed/n_samples)
-
-
 
     def assets_with_intermediate_sales(self, df, is_with_intermediate_sale):
         df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
@@ -624,7 +628,7 @@ def main():
     from sklearn.ensemble import RandomForestRegressor
     pd.set_option('display.max_columns', 120)
 
-    two_sigma_fin_mod_tools = TwoSigmaFinModTools()
+    two_sigma_fin_mod_tools = TwoSigmaFinModTools(is_portfolio_predictions=1)
     df = two_sigma_fin_mod_tools.df.copy()
     # Partioning. train_test_split() has default 25% size for test data
     # Generate random sequence from 0 to shape[0] of df
@@ -637,7 +641,7 @@ def main():
     df_test = two_sigma_fin_mod_tools.df.copy().loc[indices_25_percent, ]
     Id_df_test = df_test.id
 
-    is_explore_data = 1
+    is_explore_data = 0
     if is_explore_data:
         # Overview of train data
         print('\n TRAINING DATA:----------------------------------------------- \n')
@@ -775,7 +779,7 @@ def main():
         plt.show()
 
     ''' Prepare data '''
-    is_prepare_data = 0
+    is_prepare_data = 1
     if is_prepare_data:
         df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_train[df_train.columns[
             df_train.columns != 'y']].values, df_test[df_test.columns[df_test.columns != 'y']].values)),
@@ -784,6 +788,9 @@ def main():
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
 
         df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
+        if two_sigma_fin_mod_tools.is_portfolio_predictions:
+            df.loc[:, 'y'] = two_sigma_fin_mod_tools.transform_data_to_portfolio(df[['timestamp',
+                                                                                     'y']])[('y', 'mean')].values
         df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_merged_train_and_test)
 
         is_drop_duplicates = 0
