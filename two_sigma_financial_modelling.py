@@ -319,17 +319,15 @@ class TwoSigmaFinModTools:
         # From plot it looks like a lot of assets are bougth and sold at first and last timestamp.
         # We should of course primarily select assets based on how much they are correlated with y
 
-        correlation_threshold_value = 0.1
+        correlation_threshold_value = 0.002
         correlation_coeffecients = self.correlation_coeffecients
-        logical = correlation_coeffecients > correlation_threshold_value
-        assets_corr_y_indices = np.where(logical)
-        # asset names
+        logical = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'] > correlation_threshold_value
+        assets_corr_y_indices = np.where(logical)[0]
+        # asset_names = df.corr().timestamp.reset_index().loc[assets_corr_y_indices[0],].level_0
+        asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
         # Todo: make a check if any intermediate sales assets are among the most corr with y
 
-        return df
-
-    def assets_corr_with_y(self, df):
-        self.correlation_coeffecients = df.corr().y
+        return df.loc[:, asset_names]
 
     def prepare_data(self, df):
         df = df.copy()
@@ -338,7 +336,7 @@ class TwoSigmaFinModTools:
         if TwoSigmaFinModTools._is_not_import_data:
             if self.is_portfolio_predictions:
                 df = TwoSigmaFinModTools.transform_data_to_portfolio(df)
-                df = TwoSigmaFinModTools.portfolio_timestamp_period_with_most_highly_corr_assets(df)
+                df = self.portfolio_timestamp_period_with_most_highly_corr_assets(df)
 
             df = self.drop_variable_before_preparation(df, limit_of_nans=0.04)
 
@@ -815,7 +813,7 @@ def main():
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
 
         if two_sigma_fin_mod_tools.is_portfolio_predictions:
-            two_sigma_fin_mod_tools.assets_corr_with_y(df)
+            two_sigma_fin_mod_tools.correlation_coeffecients = df.corr().y
             df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
             y_mean = TwoSigmaFinModTools.transform_data_to_portfolio(df[['timestamp',
                                                                          'y']])[('y', 'mean')].values
