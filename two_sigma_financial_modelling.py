@@ -33,7 +33,7 @@ import seaborn as sns
 class TwoSigmaFinModTools:
     def __init__(self):
         self.df = TwoSigmaFinModTools.df
-        self.df_test = TwoSigmaFinModTools.df_test
+        # self.df_test = TwoSigmaFinModTools.df_test
         self.df_all_feature_var_names = []
         self.df_test_all_feature_var_names = []
         self.timestamp = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss')
@@ -53,45 +53,31 @@ class TwoSigmaFinModTools:
     # For upload.
     # with pd.HDFStore("../input/train.h5", "r") as train:
     # For local run.
+    # Training data
     with pd.HDFStore("/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/input/train.h5", "r") as train:
         df = train.get("train")
 
-    # Todo: consider moving partition for validation data from main() to this point
-    df_test = []
+    # Only training data was provided
+    # df_test = []
 
     @staticmethod
     def square_feet_to_meters(area):
         square_meter_per_square_feet = 0.3048**2
         return area*square_meter_per_square_feet
 
-    # @staticmethod
-    # def extract_numerical_features(df):
-    #     df = df.copy()
-    #     # Identify numerical columns which are of type object
-    #     numerical_features = pd.Series(data=False, index=df.columns, dtype=bool)
-    #
-    #     for feature in df.columns:
-    #         if any(tuple(df[feature].apply(lambda x: type(x)) == int)) or \
-    #                         any(tuple(df[feature].apply(lambda x: type(x)) == float)) & \
-    #                         (not any(tuple(df[feature].apply(lambda x: type(x)) == str))):
-    #             numerical_features[feature] = 1
-    #     return numerical_features[numerical_features == 1].index
-
     @staticmethod
     def extract_numerical_features(df):
         df = df.copy()
         df = df.copy()
-        # Todo: exclude the hidden numerical types
-        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(df) == 0)]
-        # return df.select_dtypes(exclude=[[np.number, np.int]])
+        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(
+            df) == 0)]
         return non_numerical_feature_names
 
     @staticmethod
     def extract_non_numerical_features(df):
         df = df.copy()
-        # Todo: exclude the hidden numerical types
-        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(df))]
-        # return df.select_dtypes(exclude=[[np.number, np.int]])
+        non_numerical_feature_names = df.columns[np.where(TwoSigmaFinModTools.numerical_feature_logical_incl_hidden_num(
+            df))]
         return non_numerical_feature_names
 
     @staticmethod
@@ -118,8 +104,8 @@ class TwoSigmaFinModTools:
                     df = df.dropna()
                 else:
                     df = df.dropna(1)
-                    TwoSigmaFinModTools._feature_names_num = pd.Series(data=np.intersect1d(TwoSigmaFinModTools._feature_names_num
-                                                                                   .values, df.columns), dtype=object)
+                    TwoSigmaFinModTools._feature_names_num = pd.Series(data=np.intersect1d(
+                        TwoSigmaFinModTools._feature_names_num.values, df.columns), dtype=object)
         TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
         return df
 
@@ -132,7 +118,8 @@ class TwoSigmaFinModTools:
         feature_name_num = ''.join([estimated_var, 'Num'])
         mask = ~df[estimated_var].isnull()
         df[feature_name_num] = df[estimated_var]
-        df.loc[mask, tuple([feature_name_num])] = np.reshape(df[estimated_var].factorize()[0][mask[mask == 1].index], (df.shape[0], 1))
+        df.loc[mask, tuple([feature_name_num])] = np.reshape(df[estimated_var].factorize()[0][mask[mask == 1].index],
+                                                             (df.shape[0], 1))
 
     @staticmethod
     def label_classes(df, estimated_var):
@@ -174,9 +161,9 @@ class TwoSigmaFinModTools:
         # Although it may occur in real life that a training set may hold a feature_var_name. But it is probably
         # avoided since such features cannot
         # be part of the trained learning algo.
-        # Add missing feature_var_names of traning set not occuring in test set. Add these with zeros in columns.
+        # Add missing feature_var_names of training set not occurring in test set. Add these with zeros in columns.
         if not any(tuple(df.columns == 'y')):
-            # All one-hot encoded feature var names occuring in test data is assigned the private public varaible
+            # All one-hot encoded feature var names occurring in test data is assigned the public variable
             # df_test_all_feature_var_names.
             self.df_test_all_feature_var_names = df.columns
 
@@ -255,9 +242,8 @@ class TwoSigmaFinModTools:
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 numerical_feature_names_of_non_modified_df = numerical_feature_names_of_non_modified_df.values
             else:
-                numerical_feature_names_of_non_modified_df = np.concatenate([TwoSigmaFinModTools._feature_names_num.values,
-                                                                             numerical_feature_names_of_non_modified_df
-                                                                            .values])
+                numerical_feature_names_of_non_modified_df = np.concatenate(
+                    [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
 
             relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
                 (df[numerical_feature_names_of_non_modified_df].columns != 'Id')]
@@ -308,7 +294,6 @@ class TwoSigmaFinModTools:
         date_time = '20170614_00h07m32s'
         with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.h5']), 'r') as train:
             return train.get(dataframe_name)
-        # return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
 
     @staticmethod
     def drop_num_features(df):
@@ -335,7 +320,6 @@ class TwoSigmaFinModTools:
             df = self.feature_scaling(df)
 
             is_save_dataframe = 1
-            # Todo: change saving format to .h5 instead of csv
             if is_save_dataframe:
                 self.save_dataframe(df)
                 TwoSigmaFinModTools.is_dataframe_with_target_value = 0
@@ -376,7 +360,7 @@ class TwoSigmaFinModTools:
             if not TwoSigmaFinModTools._is_one_hot_encoder:
                 numerical_feature_names_of_non_modified_df = np.concatenate(
                     [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
-            # Include scaling of Call Outcome
+            # Include scaling of y
             y = df['y'].values
             relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
                 (df[numerical_feature_names_of_non_modified_df].columns != 'y')
@@ -443,9 +427,11 @@ class TwoSigmaFinModTools:
         # 1) make cutting strategi that checks on amax until the intermediate amax is found.
         # 2) After first cut, decide on the left cutted part if amax has length len.
         # 3) If True continue by making additional cut on right hand part,
-        # 3i) then make check on left part of new cut to see if amax equals len. If True iterate from 3) if False iterate 4).
+        # 3i) then make check on left part of new cut to see if amax equals len. If True iterate from 3) if False
+        # iterate 4).
         # 4) If False continue with new cut on same left part,
-        # 4i) then make check on left part of new cut to see if amax equals len. If True iterate from 3) if False iterate 4).
+        # 4i) then make check on left part of new cut to see if amax equals len. If True iterate from 3) if False
+        # iterate 4).
 
         # id of assets with intermediate trades
         is_with_intermediate_sale = is_with_intermediate_sale.drop(['index'], axis=1)
@@ -455,7 +441,8 @@ class TwoSigmaFinModTools:
         # Timestamp length diffs with len for assets with intermediate sale
         timestamp_length_and_len_diffs = (df_grouped_by_id[('timestamp', 'amax')]
                                           - df_grouped_by_id[('timestamp', 'amin')]
-                                          - (df_grouped_by_id[('timestamp', 'len')] - 1)).reset_index().loc[indices_with_intermediate_trades]
+                                          - (df_grouped_by_id[('timestamp', 'len')] - 1)).reset_index().loc[
+            indices_with_intermediate_trades]
         print('\n')
         print('timestamp length and len diffs:', '\n')
         print(timestamp_length_and_len_diffs)
@@ -491,13 +478,16 @@ class TwoSigmaFinModTools:
         :param amax:
         :return:
         '''
-        asset_timestamps = df[['timestamp', 'id']][(df.id == id) & (df.timestamp >= amin.values[0]) & (df.timestamp <= amax.values[0])].groupby('timestamp').timestamp
+        asset_timestamps = df[['timestamp', 'id']][(df.id == id) & (df.timestamp >= amin.values[0])
+                                                   & (df.timestamp <= amax.values[0])].groupby('timestamp').timestamp
         # Find midway timestamp of particular id
         midway_timestamp = asset_timestamps.apply(int).values[round(len(asset_timestamps.apply(int).values)/2)]
 
-        is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left = self.check_timestamps_left_part(df, midway_timestamp, amin, id)
+        is_timestamp_diff_equal_len_left, amin_left, amax_left, lenght_left = self.check_timestamps_left_part(
+            df, midway_timestamp, amin, id)
         if is_timestamp_diff_equal_len_left.values[0]:
-            is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right = self.check_timestamps_right_part(df, midway_timestamp, amax, id)
+            is_timestamp_diff_equal_len_right, amin_right, amax_right, lenght_right = self.check_timestamps_right_part(
+                df, midway_timestamp, amax, id)
             if lenght_right.values[0]:
                 return amin_right, amax_right
             else:
@@ -552,8 +542,6 @@ class TwoSigmaFinModTools:
         residuals = np.absolute(y_predicted - y_test_split)
         rmse_pred_vs_actual = self.rmse(y_predicted, y_test_split)
         outliers_mask = residuals >= rmse_pred_vs_actual
-        # outliers_mask = np.insert(np.zeros((np.shape(y_train_split)[0],), dtype=np.int), np.shape(y_train_split)[0],
-        #                           outliers_mask)
         outliers_mask = np.concatenate([np.zeros((np.shape(y_train_split)[0],), dtype=bool), outliers_mask])
         not_an_outlier = outliers_mask == 0
         # Resample the training set from split, since the set was randomly split
@@ -581,11 +569,6 @@ class TwoSigmaFinModTools:
         x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
         dtrain_split = xgb.DMatrix(x_train_split, label=y_train_split)
         dtest_split = xgb.DMatrix(x_test_split)
-
-        # res = xgb.cv(xgb_params, dtrain_split, num_boost_round=1000, nfold=4, seed=seed, stratified=False,
-        #              early_stopping_rounds=25, verbose_eval=10, show_stdv=True)
-        #
-        # best_nrounds = res.shape[0] - 1
         print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
         gbdt = xgb.train(xgb_params, dtrain_split, best_nrounds)
         y_predicted = gbdt.predict(dtest_split)
@@ -643,8 +626,7 @@ def main():
 
     two_sigma_fin_mod_tools = TwoSigmaFinModTools()
     df = two_sigma_fin_mod_tools.df.copy()
-    # Todo: do partioning. train_test_split() has default 25% size for test data
-    # x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+    # Partioning. train_test_split() has default 25% size for test data
     # Generate random sequence from 0 to shape[0] of df
     indices_shuffled = np.arange(df.shape[0])
     np.random.shuffle(indices_shuffled)
@@ -698,8 +680,8 @@ def main():
         plt.title(''.join(['Asset ', str(asset_id)]))
 
         # When are the assets sold and bought?
-        # how can we be sure that they are not sold in between and hold for less time? checking on amax of timestamp just
-        # indicates first time the asset is bought and last time indicates last time the asset is sold.
+        # how can we be sure that they are not sold in between and hold for less time? checking on amax of timestamp
+        # just indicates first time the asset is bought and last time indicates last time the asset is sold.
 
         df_grouped_by_id = df[['id', 'timestamp', 'y']].groupby('id').agg([np.min, np.max, len]).reset_index()
         df_grouped_by_id.sort_values([('timestamp', 'amax')], inplace=True, ascending=False)
@@ -722,7 +704,6 @@ def main():
         intermediate_sales_df = two_sigma_fin_mod_tools.assets_with_intermediate_sales(df, is_with_intermediate_sale)
         print(intermediate_sales_df)
 
-
         # Plot only intermediate sales of assets.
         # Notice for intermediate sales assets are sold at amin and bought at amax.
         plt.figure()
@@ -739,9 +720,12 @@ def main():
         # Plot includes intermediate sales of assets.
         # Notice for intermediate sales assets are sold at amin and bought at amax.
         plt.figure()
-        amin_values = np.insert(df_grouped_by_id[('timestamp', 'amin')].values, np.shape(df_grouped_by_id[('timestamp', 'amin')].values)[0], intermediate_sales_df.amax.values, axis=0)
-        amax_values = np.insert(df_grouped_by_id[('timestamp', 'amax')].values, np.shape(df_grouped_by_id[('timestamp', 'amax')].values)[0], intermediate_sales_df.amin.values, axis=0)
-        id_array = np.insert(df_grouped_by_id.id.values, np.shape(df_grouped_by_id.id.values)[0], intermediate_sales_df.id.values)
+        amin_values = np.insert(df_grouped_by_id[('timestamp', 'amin')].values, np.shape(
+            df_grouped_by_id[('timestamp', 'amin')].values)[0], intermediate_sales_df.amax.values, axis=0)
+        amax_values = np.insert(df_grouped_by_id[('timestamp', 'amax')].values, np.shape(
+            df_grouped_by_id[('timestamp', 'amax')].values)[0], intermediate_sales_df.amin.values, axis=0)
+        id_array = np.insert(df_grouped_by_id.id.values, np.shape(df_grouped_by_id.id.values)[0],
+                             intermediate_sales_df.id.values)
         plt.plot(amin_values, id_array, '.', label='bought')
         plt.plot(amax_values, id_array, '.', color='r', label='sold')
         plt.title('With intermediate trades')
@@ -793,14 +777,8 @@ def main():
     ''' Prepare data '''
     is_prepare_data = 0
     if is_prepare_data:
-        # Train model with xgboost as binary classification problem
-        # change indices of data frame to run from 0 to end
-
-        # Todo: implement ratio 20% test/validation data and 80 % training data with random partion
-        # Look at code for the outliers where a partition is used
-
-        df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_train[df_train.columns[df_train.columns != 'y']].values,
-                                                                     df_test[df_test.columns[df_test.columns != 'y']].values)),
+        df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_train[df_train.columns[
+            df_train.columns != 'y']].values, df_test[df_test.columns[df_test.columns != 'y']].values)),
                                                 columns=df_test.columns[df_test.columns != 'y'])
 
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
@@ -812,11 +790,16 @@ def main():
         if is_drop_duplicates:
             # Do not drop duplicates in test
             uniques_indices = df_merged_train_and_test[:df_train.shape[0]][df_test_num_features].drop_duplicates().index
-            df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_merged_train_and_test.loc[uniques_indices].values, df_merged_train_and_test[df_train.shape[0]::].values)), columns=df_merged_train_and_test.columns)
+            df_merged_train_and_test = pd.DataFrame(data=np.concatenate((df_merged_train_and_test.loc[
+                                                                             uniques_indices].values,
+                                                                         df_merged_train_and_test[
+                                                                         df_train.shape[0]::].values)),
+                                                    columns=df_merged_train_and_test.columns)
             target_value = df_train.Target.values[uniques_indices]
 
-            train_data = np.concatenate((df_merged_train_and_test[df_test_num_features].values[:uniques_indices.shape[0]],
-                                         np.reshape(target_value, (target_value.shape[0], 1))), axis=1)
+            train_data = np.concatenate((df_merged_train_and_test[df_test_num_features].values[
+                                         :uniques_indices.shape[0]], np.reshape(target_value,
+                                                                                (target_value.shape[0], 1))), axis=1)
             test_data = df_merged_train_and_test[uniques_indices.shape[0]::][df_test_num_features].values
         else:
             train_data = np.concatenate(
@@ -831,7 +814,6 @@ def main():
         print('All df set missing values')
         two_sigma_fin_mod_tools.missing_values_in_dataframe(df)
 
-    # Todo: correct methods below to handle two_sigma data
     is_make_a_prediction = 0
     if is_make_a_prediction:
         ''' XGBoost and Regularized Linear Models and Random Forest '''
@@ -898,9 +880,9 @@ def main():
                     print('\nFeatures:')
                     df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_test)
                     print(np.reshape(
-                          np.append(np.array(list(df_test_num_features)), np.arange(0, len(list(df_test_num_features)))),
-                          (len(list(df_test_num_features)), 2),
-                          'F'))  # , 2, len(list(df_test)))
+                          np.append(np.array(list(df_test_num_features)), np.arange(0,
+                                                                                    len(list(df_test_num_features)))),
+                        (len(list(df_test_num_features)), 2), 'F'))  # , 2, len(list(df_test)))
 
                     print('\nFeature ranking:')
                     for f in range(x_train.shape[1]):
@@ -916,8 +898,8 @@ def main():
                 # We get that 21 features are selected
 
                 title_name = ''.join([add_name_of_regressor, ' Feature Selection'])
-                two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(forest_feature_selection, x_train_new, y_train,
-                                                                        title_name)
+                two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(forest_feature_selection, x_train_new,
+                                                                          y_train, title_name)
                 # plt.show()
                 forest_feature_selected = forest_feature_selection.fit(x_train_new, y_train)
                 score = forest_feature_selected.score(x_train_new, y_train)
@@ -969,7 +951,8 @@ def main():
         # output = output_xgb_cv
 
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
-        two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', two_sigma_fin_mod_tools.timestamp, '.pdf']))
+        two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_',
+                                                   two_sigma_fin_mod_tools.timestamp, '.pdf']))
         plt.show()
 
     if is_make_a_prediction:
@@ -981,9 +964,8 @@ def main():
         #     output = np.expm1(output)
 
         submission = pd.DataFrame({'id': Id_df_test, 'y': output})
-        # Todo: submission should also be in .h5 format and csv
-        # submission.to_csv(''.join([save_path, 'submission_two_sigma_fin_mod_tools_', two_sigma_fin_mod_tools.timestamp, '.csv']), index=False)
-        with pd.HDFStore(''.join([save_path, 'submission_two_sigma_fin_mod_tools_', two_sigma_fin_mod_tools.timestamp, '.h5']), 'w') as submit:
+        with pd.HDFStore(''.join([save_path, 'submission_two_sigma_fin_mod_tools_',
+                                  two_sigma_fin_mod_tools.timestamp, '.h5']), 'w') as submit:
             submit.put('submission_two_sigma_fin_mod_tools', submission)
         print(two_sigma_fin_mod_tools.timestamp)
 
