@@ -32,6 +32,7 @@ import seaborn as sns
 
 class TwoSigmaFinModTools:
     def __init__(self, is_portfolio_predictions=0):
+        self.correlation_coeffecients = []
         self.is_portfolio_predictions = is_portfolio_predictions
         self.df = TwoSigmaFinModTools.df
         # self.df_test = TwoSigmaFinModTools.df_test
@@ -300,10 +301,35 @@ class TwoSigmaFinModTools:
             df = df.drop([feature_name], axis=1)
         return df
 
-    def transform_data_to_portfolio(self, df):
+    @staticmethod
+    def transform_data_to_portfolio(df):
         # The mean of a portfolio corresponds to the return.
         # A way to easier model the mean is to fit the cumulative mean instead.
         return df.groupby('timestamp').agg([np.mean]).reset_index()
+
+    def portfolio_timestamp_period_with_most_highly_corr_assets(self, df):
+        # A first approximation to model portfolio returns:
+        # i) Find assets that correlates with y, where correlation is higher than a threshold value
+        # ii) Include only above assets and find maximum timestamp period with most assets
+        # iii) Transform target value y to be cumulative mean of y in order to obtain monotonic behaviour
+        # iv) Train model to predict transformed target value with the selected most correlated assets in selected
+        # timestamp interval
+        # v) Run model on test data and apply inverse transform to get target value y.
+
+        # From plot it looks like a lot of assets are bougth and sold at first and last timestamp.
+        # We should of course primarily select assets based on how much they are correlated with y
+
+        correlation_threshold_value = 0.1
+        correlation_coeffecients = self.correlation_coeffecients
+        logical = correlation_coeffecients > correlation_threshold_value
+        assets_corr_y_indices = np.where(logical)
+        # asset names
+        # Todo: make a check if any intermediate sales assets are among the most corr with y
+
+        return df
+
+    def assets_corr_with_y(self, df):
+        self.correlation_coeffecients = df.corr().y
 
     def prepare_data(self, df):
         df = df.copy()
@@ -311,7 +337,8 @@ class TwoSigmaFinModTools:
         TwoSigmaFinModTools._is_not_import_data = 1
         if TwoSigmaFinModTools._is_not_import_data:
             if self.is_portfolio_predictions:
-                df = self.transform_data_to_portfolio(df)
+                df = TwoSigmaFinModTools.transform_data_to_portfolio(df)
+                df = TwoSigmaFinModTools.portfolio_timestamp_period_with_most_highly_corr_assets(df)
 
             df = self.drop_variable_before_preparation(df, limit_of_nans=0.04)
 
@@ -787,10 +814,15 @@ def main():
 
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
 
-        df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
         if two_sigma_fin_mod_tools.is_portfolio_predictions:
-            df.loc[:, 'y'] = two_sigma_fin_mod_tools.transform_data_to_portfolio(df[['timestamp',
-                                                                                     'y']])[('y', 'mean')].values
+            two_sigma_fin_mod_tools.assets_corr_with_y(df)
+            df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
+            y_mean = TwoSigmaFinModTools.transform_data_to_portfolio(df[['timestamp',
+                                                                         'y']])[('y', 'mean')].values
+            y_mean_cum = y_mean.cumsum()
+        else:
+            df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
+
         df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_merged_train_and_test)
 
         is_drop_duplicates = 0
@@ -802,7 +834,7 @@ def main():
                                                                          df_merged_train_and_test[
                                                                          df_train.shape[0]::].values)),
                                                     columns=df_merged_train_and_test.columns)
-            target_value = df_train.Target.values[uniques_indices]
+            target_value = df_train.y.values[uniques_indices]
 
             train_data = np.concatenate((df_merged_train_and_test[df_test_num_features].values[
                                          :uniques_indices.shape[0]], np.reshape(target_value,
