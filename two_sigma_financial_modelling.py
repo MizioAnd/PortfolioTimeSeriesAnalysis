@@ -278,8 +278,8 @@ class TwoSigmaFinModTools:
 
     def drop_variable_before_preparation(self, df):
         # Acceptable limit of NaN in features
-        # limit_of_nans = 0.3*df.shape[0]
-        limit_of_nans = 0.04 * df.shape[0]
+        limit_of_nans = 0.3*df.shape[0]
+        # limit_of_nans = 0.04 * df.shape[0]
         for feature in self.features_with_missing_values_in_dataframe(df).index:
             if df[feature].isnull().sum() > limit_of_nans:
                 df = df.drop([feature], axis=1)
@@ -304,7 +304,8 @@ class TwoSigmaFinModTools:
         # one-hot encoded
         # not one-hot
         # date_time = '20170613_19h09m40s'
-        date_time = '20170613_19h34m31s'
+        # date_time = '20170613_19h34m31s'
+        date_time = '20170614_00h07m32s'
         with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.h5']), 'r') as train:
             return train.get(dataframe_name)
         # return pd.read_csv(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.csv']), header=0)
@@ -316,7 +317,7 @@ class TwoSigmaFinModTools:
             df = df.drop([feature_name], axis=1)
         return df
 
-    def prepare_data_random_forest(self, df):
+    def prepare_data(self, df):
         df = df.copy()
 
         TwoSigmaFinModTools._is_not_import_data = 0
@@ -654,7 +655,7 @@ def main():
     df_test = two_sigma_fin_mod_tools.df.copy().loc[indices_25_percent, ]
     Id_df_test = df_test.id
 
-    is_explore_data = 0
+    is_explore_data = 1
     if is_explore_data:
         # Overview of train data
         print('\n TRAINING DATA:----------------------------------------------- \n')
@@ -790,7 +791,7 @@ def main():
         plt.show()
 
     ''' Prepare data '''
-    is_prepare_data = 1
+    is_prepare_data = 0
     if is_prepare_data:
         # Train model with xgboost as binary classification problem
         # change indices of data frame to run from 0 to end
@@ -804,7 +805,7 @@ def main():
 
         df_merged_train_and_test.index = np.arange(0, df_merged_train_and_test.shape[0])
 
-        df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data_random_forest(df_merged_train_and_test)
+        df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
         df_test_num_features = two_sigma_fin_mod_tools.extract_numerical_features(df_merged_train_and_test)
 
         is_drop_duplicates = 0
@@ -831,7 +832,7 @@ def main():
         two_sigma_fin_mod_tools.missing_values_in_dataframe(df)
 
     # Todo: correct methods below to handle two_sigma data
-    is_make_a_prediction = 1
+    is_make_a_prediction = 0
     if is_make_a_prediction:
         ''' XGBoost and Regularized Linear Models and Random Forest '''
         print("\nPrediction Stats:")
@@ -844,8 +845,7 @@ def main():
         print('\nShapes test data')
         print(np.shape(test_data))
 
-
-        is_lasso = 0
+        is_lasso = 1
         if is_lasso:
             # x_train = np.asarray(x_train, dtype=long)
             # y_train = np.asarray(y_train, dtype=long)
@@ -927,7 +927,7 @@ def main():
                 print(score)
 
         ''' xgboost '''
-        is_xgb_cv = 1
+        is_xgb_cv = 0
         if is_xgb_cv:
             seed = 0
             dtrain = xgb.DMatrix(x_train, label=y_train)
@@ -964,9 +964,9 @@ def main():
 
         # Averaging the output using four different machine learning estimators
         # output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
-        # output = output_lasso
+        output = output_lasso
         # output = output_feature_selection_lasso
-        output = output_xgb_cv
+        # output = output_xgb_cv
 
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
         two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', two_sigma_fin_mod_tools.timestamp, '.pdf']))
