@@ -327,7 +327,7 @@ class TwoSigmaFinModTools:
         asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
         # Todo: make a check if any intermediate sales assets are among the most corr with y
 
-        return df.loc[:, asset_names]
+        return df.loc[:, df.columns.get_level_values(0).isin(asset_names)]
 
     def prepare_data(self, df):
         df = df.copy()
