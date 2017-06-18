@@ -346,7 +346,7 @@ class TwoSigmaFinModTools:
             self.feature_mapping_to_numerical_values(df)
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
-            self.feature_engineering(df)
+            # self.feature_engineering(df)
             df = self.clean_data(df, is_with_MICE=0)
             df = self.feature_scaling(df)
 
@@ -406,9 +406,12 @@ class TwoSigmaFinModTools:
             if not TwoSigmaFinModTools._is_one_hot_encoder:
                 numerical_feature_names_of_non_modified_df = np.concatenate(
                     [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
-
-            relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
-                (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
+            if self.is_portfolio_predictions:
+                relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                    (df[numerical_feature_names_of_non_modified_df].columns != 'id')].get_level_values(0)
+            else:
+                relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                    (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
             mask = ~df[relevant_features].isnull()
             res = standard_scaler.fit_transform(df[relevant_features][mask].values)
             if mask.sum().sum() > 0:
@@ -839,13 +842,25 @@ def main():
                                                                                 (target_value.shape[0], 1))), axis=1)
             test_data = df_merged_train_and_test[uniques_indices.shape[0]::][df_test_num_features].values
         else:
-            train_data = np.concatenate(
-                (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
-                 np.reshape(df_train.y.values, (df_train.shape[0], 1))), axis=1)
-            # test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
-            test_data = np.concatenate(
-                (df_merged_train_and_test[df_test_num_features].values[:df_test.shape[0]],
-                 np.reshape(df_test.y.values, (df_test.shape[0], 1))), axis=1)
+            if two_sigma_fin_mod_tools.is_portfolio_predictions:
+                # Todo: implement correct way to separate training and test data. Basically the two sets should have
+                # each their own preparation, since an average is made over equal timestamps in the portfolio. Hence
+                # it will not be possible to extract to individual averages after preparation.
+                train_data = np.concatenate(
+                    (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
+                     np.reshape(y_mean_cum, (df_train.shape[0], 1))), axis=1)
+                # test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
+                test_data = np.concatenate(
+                    (df_merged_train_and_test[df_test_num_features].values[:df_test.shape[0]],
+                     np.reshape(df_test.y.values, (df_test.shape[0], 1))), axis=1)
+            else:
+                train_data = np.concatenate(
+                    (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
+                     np.reshape(df_train.y.values, (df_train.shape[0], 1))), axis=1)
+                # test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
+                test_data = np.concatenate(
+                    (df_merged_train_and_test[df_test_num_features].values[:df_test.shape[0]],
+                     np.reshape(df_test.y.values, (df_test.shape[0], 1))), axis=1)
 
         # missing_values
         print('All df set missing values')
