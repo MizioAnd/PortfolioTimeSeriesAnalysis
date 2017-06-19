@@ -34,8 +34,8 @@ class TwoSigmaFinModTools:
     def __init__(self, is_portfolio_predictions=0, number_of_assets_in_portfolio=11):
         self.correlation_coeffecients = []
         self.is_portfolio_predictions = is_portfolio_predictions
-        self.number_of_assets_in_portfolio = number_of_assets_in_portfolio
         self.df = TwoSigmaFinModTools.df
+        self.number_of_assets_in_portfolio = number_of_assets_in_portfolio
         # self.df_test = TwoSigmaFinModTools.df_test
         self.df_all_feature_var_names = []
         self.df_test_all_feature_var_names = []
@@ -323,15 +323,9 @@ class TwoSigmaFinModTools:
         # From plot it looks like a lot of assets are bought and sold at first and last timestamp.
         # We should of course primarily select assets based on how much they are correlated with y
 
-        # Todo: make choice on number of assets to include instead of threshold value
-        # Sort with and extract number of names
-        correlation_threshold_value = 0.0025
         correlation_coeffecients = self.correlation_coeffecients
         names_of_assets = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'].sort_values(
             ascending=False).head(self.number_of_assets_in_portfolio).index
-        # logical = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'] > correlation_threshold_value
-        # assets_corr_y_indices = np.where(logical)[0]
-        # asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
         # Todo: make a check if any intermediate sales assets are among the most corr with y
         return df.loc[:, names_of_assets]
 
@@ -344,7 +338,7 @@ class TwoSigmaFinModTools:
                 df = TwoSigmaFinModTools.transform_data_to_portfolio(df)
                 df = self.portfolio_timestamp_period_with_most_highly_corr_assets(df)
 
-            df = self.drop_variable_before_preparation(df, limit_of_nans=0.04)
+            df = self.drop_variable_before_preparation(df, limit_of_nans=1.0)
 
             TwoSigmaFinModTools._non_numerical_feature_names = TwoSigmaFinModTools.extract_non_numerical_features(df)
             TwoSigmaFinModTools._numerical_feature_names = TwoSigmaFinModTools.extract_numerical_features(df)
@@ -660,7 +654,7 @@ def main():
     from sklearn.ensemble import RandomForestRegressor
     pd.set_option('display.max_columns', 120)
 
-    two_sigma_fin_mod_tools = TwoSigmaFinModTools(is_portfolio_predictions=1, number_of_assets_in_portfolio=40)
+    two_sigma_fin_mod_tools = TwoSigmaFinModTools(is_portfolio_predictions=1, number_of_assets_in_portfolio=200)
     df = two_sigma_fin_mod_tools.df.copy()
     # Partioning. train_test_split() has default 25% size for test data
     # Generate random sequence from 0 to shape[0] of df
@@ -1012,7 +1006,7 @@ def main():
 
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
         if two_sigma_fin_mod_tools.is_portfolio_predictions:
-            text_is_portfolio = ''.join(['Number_of_assets', str(x_train.shape[0]), '_'])
+            text_is_portfolio = ''.join(['Number_of_assets', str(x_train.shape[1]), '_'])
         else:
             text_is_portfolio = ''
         two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', text_is_portfolio,
