@@ -843,16 +843,18 @@ def main():
             test_data = df_merged_train_and_test[uniques_indices.shape[0]::][df_test_num_features].values
         else:
             if two_sigma_fin_mod_tools.is_portfolio_predictions:
-                # Todo: implement correct way to separate training and test data. Basically the two sets should have
+                # Implement correct way to separate training and test data. Basically, the two sets should have
                 # each their own preparation, since an average is made over equal timestamps in the portfolio. Hence
-                # it will not be possible to extract to individual averages after preparation.
-                train_data = np.concatenate(
-                    (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
-                     np.reshape(y_mean_cum, (df_train.shape[0], 1))), axis=1)
-                # test_data = df_merged_train_and_test[df_train.shape[0]::][df_test_num_features].values
-                test_data = np.concatenate(
-                    (df_merged_train_and_test[df_test_num_features].values[:df_test.shape[0]],
-                     np.reshape(df_test.y.values, (df_test.shape[0], 1))), axis=1)
+                # it will not be possible to extract two individual averages after preparation.
+                #
+                # Hack
+                # Make new train and test partition using now builtin method train_test_split() (default 25% test)
+                x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(
+                    df_merged_train_and_test.values, y_mean_cum)
+                train_data = np.concatenate((x_train_split, np.reshape(y_train_split, (y_train_split.shape[0], 1))),
+                                            axis=1)
+                test_data = np.concatenate((x_test_split, np.reshape(y_test_split, (y_test_split.shape[0], 1))),
+                                           axis=1)
             else:
                 train_data = np.concatenate(
                     (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
