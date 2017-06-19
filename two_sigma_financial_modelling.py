@@ -31,9 +31,10 @@ from sklearn.cluster import FeatureAgglomeration
 import seaborn as sns
 
 class TwoSigmaFinModTools:
-    def __init__(self, is_portfolio_predictions=0):
+    def __init__(self, is_portfolio_predictions=0, number_of_assets_in_portfolio=11):
         self.correlation_coeffecients = []
         self.is_portfolio_predictions = is_portfolio_predictions
+        self.number_of_assets_in_portfolio = number_of_assets_in_portfolio
         self.df = TwoSigmaFinModTools.df
         # self.df_test = TwoSigmaFinModTools.df_test
         self.df_all_feature_var_names = []
@@ -326,9 +327,8 @@ class TwoSigmaFinModTools:
         # Sort with and extract number of names
         correlation_threshold_value = 0.0025
         correlation_coeffecients = self.correlation_coeffecients
-        number_of_assets_in_portfolio = 11
         names_of_assets = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'].sort_values(
-            ascending=False).head(number_of_assets_in_portfolio).index
+            ascending=False).head(self.number_of_assets_in_portfolio).index
         # logical = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'] > correlation_threshold_value
         # assets_corr_y_indices = np.where(logical)[0]
         # asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
@@ -660,7 +660,7 @@ def main():
     from sklearn.ensemble import RandomForestRegressor
     pd.set_option('display.max_columns', 120)
 
-    two_sigma_fin_mod_tools = TwoSigmaFinModTools(is_portfolio_predictions=1)
+    two_sigma_fin_mod_tools = TwoSigmaFinModTools(is_portfolio_predictions=1, number_of_assets_in_portfolio=40)
     df = two_sigma_fin_mod_tools.df.copy()
     # Partioning. train_test_split() has default 25% size for test data
     # Generate random sequence from 0 to shape[0] of df
@@ -1011,7 +1011,12 @@ def main():
         # output = output_xgb_cv
 
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
-        two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_',
+        if two_sigma_fin_mod_tools.is_portfolio_predictions:
+            text_is_portfolio = ''.join(['Number_of_assets', str(two_sigma_fin_mod_tools.number_of_assets_in_portfolio),
+                                         '_'])
+        else:
+            text_is_portfolio = ''
+        two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', text_is_portfolio,
                                                    two_sigma_fin_mod_tools.timestamp, '.pdf']))
         plt.show()
 
