@@ -322,18 +322,23 @@ class TwoSigmaFinModTools:
         # From plot it looks like a lot of assets are bought and sold at first and last timestamp.
         # We should of course primarily select assets based on how much they are correlated with y
 
-        correlation_threshold_value = 0.002
+        # Todo: make choice on number of assets to include instead of threshold value
+        # Sort with and extract number of names
+        correlation_threshold_value = 0.0025
         correlation_coeffecients = self.correlation_coeffecients
-        logical = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'] > correlation_threshold_value
-        assets_corr_y_indices = np.where(logical)[0]
-        asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
+        number_of_assets_in_portfolio = 11
+        names_of_assets = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'].sort_values(
+            ascending=False).head(number_of_assets_in_portfolio).index
+        # logical = correlation_coeffecients.loc[correlation_coeffecients.index != 'y'] > correlation_threshold_value
+        # assets_corr_y_indices = np.where(logical)[0]
+        # asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
         # Todo: make a check if any intermediate sales assets are among the most corr with y
-        return df.loc[:, asset_names]
+        return df.loc[:, names_of_assets]
 
     def prepare_data(self, df):
         df = df.copy()
 
-        TwoSigmaFinModTools._is_not_import_data = 0
+        TwoSigmaFinModTools._is_not_import_data = 1
         if TwoSigmaFinModTools._is_not_import_data:
             if self.is_portfolio_predictions:
                 df = TwoSigmaFinModTools.transform_data_to_portfolio(df)
