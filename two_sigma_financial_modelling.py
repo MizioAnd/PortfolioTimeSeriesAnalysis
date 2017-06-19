@@ -305,7 +305,11 @@ class TwoSigmaFinModTools:
     def transform_data_to_portfolio(df):
         # The mean of a portfolio corresponds to the return.
         # A way to easier model the mean is to fit the cumulative mean instead.
-        return df.groupby('timestamp').agg([np.mean]).reset_index()
+        df_transformed = df.groupby('timestamp').agg([np.mean]).reset_index()
+        df_transformed.columns = df_transformed.columns.get_level_values(0)
+        # df_transformed.columns = [''.join(col).strip() for col in df_transformed.columns]
+        return df_transformed
+        # return df.groupby('timestamp').agg([np.mean]).reset_index()
 
     def portfolio_timestamp_period_with_most_highly_corr_assets(self, df):
         # A first approximation to model portfolio returns:
@@ -327,7 +331,8 @@ class TwoSigmaFinModTools:
         asset_names = correlation_coeffecients.reset_index().loc[assets_corr_y_indices,].values[:,0]
         # Todo: make a check if any intermediate sales assets are among the most corr with y
 
-        return df.loc[:, df.columns.get_level_values(0).isin(asset_names)]
+        return df.loc[:, asset_names]
+        # return df.loc[:, df.columns.get_level_values(0).isin(asset_names)]
 
     def prepare_data(self, df):
         df = df.copy()
@@ -347,7 +352,7 @@ class TwoSigmaFinModTools:
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
             # self.feature_engineering(df)
-            df = self.clean_data(df, is_with_MICE=0)
+            df = self.clean_data(df, is_with_MICE=1)
             df = self.feature_scaling(df)
 
             is_save_dataframe = 1
@@ -406,12 +411,12 @@ class TwoSigmaFinModTools:
             if not TwoSigmaFinModTools._is_one_hot_encoder:
                 numerical_feature_names_of_non_modified_df = np.concatenate(
                     [TwoSigmaFinModTools._feature_names_num.values, numerical_feature_names_of_non_modified_df.values])
-            if self.is_portfolio_predictions:
-                relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
-                    (df[numerical_feature_names_of_non_modified_df].columns != 'id')].get_level_values(0)
-            else:
-                relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
-                    (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
+            # if self.is_portfolio_predictions:
+            #     relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+            #         (df[numerical_feature_names_of_non_modified_df].columns != 'id')].get_level_values(0)
+            # else:
+            relevant_features = df[numerical_feature_names_of_non_modified_df].columns[
+                (df[numerical_feature_names_of_non_modified_df].columns != 'id')]
             mask = ~df[relevant_features].isnull()
             res = standard_scaler.fit_transform(df[relevant_features][mask].values)
             if mask.sum().sum() > 0:
@@ -818,8 +823,9 @@ def main():
         if two_sigma_fin_mod_tools.is_portfolio_predictions:
             two_sigma_fin_mod_tools.correlation_coeffecients = df.corr().y
             df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
-            y_mean = TwoSigmaFinModTools.transform_data_to_portfolio(df[['timestamp',
-                                                                         'y']])[('y', 'mean')].values
+            # y_mean = TwoSigmaFinModTools.transform_data_to_portfolio(df[['timestamp',
+            #                                                              'y']])[('y', 'mean')].values
+            y_mean = TwoSigmaFinModTools.transform_data_to_portfolio(df[['timestamp', 'y']]).y.values
             y_mean_cum = y_mean.cumsum()
         else:
             df_merged_train_and_test = two_sigma_fin_mod_tools.prepare_data(df_merged_train_and_test)
