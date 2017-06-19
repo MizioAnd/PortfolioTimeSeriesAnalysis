@@ -982,8 +982,8 @@ def main():
                 'eval_metric': 'rmse',
             }
 
-            res = xgb.cv(xgb_params, dtrain, num_boost_round=1000, nfold=5, seed=seed, stratified=False,
-                         early_stopping_rounds=10, verbose_eval=10, show_stdv=True)
+            res = xgb.cv(xgb_params, dtrain, num_boost_round=10000, nfold=5, seed=seed, stratified=False,
+                         early_stopping_rounds=100, verbose_eval=10, show_stdv=True)
 
             best_nrounds = res.shape[0] - 1
             cv_mean = res.iloc[-1, 0]
