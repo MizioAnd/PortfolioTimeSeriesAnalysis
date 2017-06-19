@@ -578,9 +578,10 @@ class TwoSigmaFinModTools:
         y_out = np.insert(y_train_split, np.shape(y_train_split)[0], y_test_split, axis=0)
         return x_out[not_an_outlier, ], y_out[not_an_outlier, ]
 
-    def predicted_vs_actual_y_input_model(self, model, x_train, y_train, title_name):
+    def predicted_vs_actual_y_input_model(self, model, x_train_split, x_test_split, y_train_split, y_test_split,
+                                          title_name):
         # Split the training data into an extra set of test
-        x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+        # x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
         print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
         model.fit(x_train_split, y_train_split)
         y_predicted = model.predict(x_test_split)
@@ -593,9 +594,10 @@ class TwoSigmaFinModTools:
         plt.plot([min(y_test_split), max(y_test_split)], [min(y_test_split), max(y_test_split)])
         plt.tight_layout()
 
-    def predicted_vs_actual_y_xgb(self, xgb, best_nrounds, xgb_params, x_train, y_train, title_name):
+    def predicted_vs_actual_y_xgb(self, xgb, best_nrounds, xgb_params, x_train_split, x_test_split, y_train_split,
+                                  y_test_split, title_name):
         # Split the training data into an extra set of test
-        x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
+        # x_train_split, x_test_split, y_train_split, y_test_split = train_test_split(x_train, y_train)
         dtrain_split = xgb.DMatrix(x_train_split, label=y_train_split)
         dtest_split = xgb.DMatrix(x_test_split)
         print(np.shape(x_train_split), np.shape(x_test_split), np.shape(y_train_split), np.shape(y_test_split))
@@ -900,7 +902,8 @@ def main():
             # Make comparison plot using only the train data.
             # Predicted vs. Actual Sale price
             title_name = 'LassoCV'
-            two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(lasso, x_train, y_train, title_name)
+            two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(lasso, x_train, test_data, y_train, y_test_data,
+                                                                      title_name)
             # plt.show()
             lasso.fit(x_train, y_train)
             alpha = lasso.alpha_
@@ -910,7 +913,7 @@ def main():
             print('\nSCORE Lasso linear model:---------------------------------------------------')
             print(score)
 
-            is_feature_selection_prediction = 0
+            is_feature_selection_prediction = 1
             if is_feature_selection_prediction:
 
                 is_feature_selection_with_lasso = 1
@@ -949,8 +952,8 @@ def main():
                 # We get that 21 features are selected
 
                 title_name = ''.join([add_name_of_regressor, ' Feature Selection'])
-                two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(forest_feature_selection, x_train_new,
-                                                                          y_train, title_name)
+                two_sigma_fin_mod_tools.predicted_vs_actual_y_input_model(forest_feature_selection, x_train, test_data,
+                                                                          y_train, y_test_data, title_name)
                 # plt.show()
                 forest_feature_selected = forest_feature_selection.fit(x_train_new, y_train)
                 score = forest_feature_selected.score(x_train_new, y_train)
@@ -989,15 +992,15 @@ def main():
 
             print('Ensemble-CV: {0}+{1}'.format(cv_mean, cv_std))
             title_name = 'xgb.cv'
-            two_sigma_fin_mod_tools.predicted_vs_actual_y_xgb(xgb, best_nrounds, xgb_params, x_train, y_train,
-                                                              title_name)
+            two_sigma_fin_mod_tools.predicted_vs_actual_y_xgb(xgb, best_nrounds, xgb_params, x_train, test_data,
+                                                              y_train, y_test_data, title_name)
             # plt.show()
             gbdt = xgb.train(xgb_params, dtrain, best_nrounds)
             output_xgb_cv = gbdt.predict(dtest)
 
         # Averaging the output using four different machine learning estimators
-        # output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
-        output = (output_lasso + output_xgb_cv) / 2.0
+        output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
+        # output = (output_lasso + output_xgb_cv) / 2.0
         # output = output_lasso
         # output = output_feature_selection_lasso
         # output = output_xgb_cv
