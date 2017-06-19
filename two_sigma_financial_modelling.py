@@ -667,7 +667,7 @@ def main():
     indices_25_percent = indices_shuffled[length_of_75_percent:]
     df_train = two_sigma_fin_mod_tools.df.copy().loc[indices_75_percent, ]
     df_test = two_sigma_fin_mod_tools.df.copy().loc[indices_25_percent, ]
-    Id_df_test = df_test.id
+    id_df_test = df_test.id
 
     is_explore_data = 0
     if is_explore_data:
@@ -855,6 +855,7 @@ def main():
                                             axis=1)
                 test_data = np.concatenate((x_test_split, np.reshape(y_test_split, (y_test_split.shape[0], 1))),
                                            axis=1)
+                id_df_test = np.arange(0, test_data.shape[0])
             else:
                 train_data = np.concatenate(
                     (df_merged_train_and_test[df_test_num_features].values[:df_train.shape[0]],
@@ -868,7 +869,7 @@ def main():
         print('All df set missing values')
         two_sigma_fin_mod_tools.missing_values_in_dataframe(df)
 
-    is_make_a_prediction = 0
+    is_make_a_prediction = 1
     if is_make_a_prediction:
         ''' XGBoost and Regularized Linear Models and Random Forest '''
         print("\nPrediction Stats:")
@@ -1017,7 +1018,7 @@ def main():
         # if two_sigma_fin_mod_tools.is_with_log1p_SalePrice:
         #     output = np.expm1(output)
 
-        submission = pd.DataFrame({'id': Id_df_test, 'y': output})
+        submission = pd.DataFrame({'id': id_df_test, 'y': output})
         with pd.HDFStore(''.join([save_path, 'submission_two_sigma_fin_mod_tools_',
                                   two_sigma_fin_mod_tools.timestamp, '.h5']), 'w') as submit:
             submit.put('submission_two_sigma_fin_mod_tools', submission)
