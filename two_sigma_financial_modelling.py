@@ -290,7 +290,8 @@ class TwoSigmaFinModTools:
         # not one-hot
         # date_time = '20170613_19h09m40s'
         # date_time = '20170613_19h34m31s'
-        date_time = '20170614_00h07m32s'
+        # date_time = '20170614_00h07m32s'
+        date_time = '20170619_11h47m22s'
         with pd.HDFStore(''.join([TwoSigmaFinModTools._save_path, dataframe_name, date_time, '.h5']), 'r') as train:
             return train.get(dataframe_name)
 
@@ -318,7 +319,7 @@ class TwoSigmaFinModTools:
         # timestamp interval
         # v) Run model on test data and apply inverse transform to get target value y.
 
-        # From plot it looks like a lot of assets are bougth and sold at first and last timestamp.
+        # From plot it looks like a lot of assets are bought and sold at first and last timestamp.
         # We should of course primarily select assets based on how much they are correlated with y
 
         correlation_threshold_value = 0.002
@@ -332,7 +333,7 @@ class TwoSigmaFinModTools:
     def prepare_data(self, df):
         df = df.copy()
 
-        TwoSigmaFinModTools._is_not_import_data = 1
+        TwoSigmaFinModTools._is_not_import_data = 0
         if TwoSigmaFinModTools._is_not_import_data:
             if self.is_portfolio_predictions:
                 df = TwoSigmaFinModTools.transform_data_to_portfolio(df)
@@ -346,7 +347,7 @@ class TwoSigmaFinModTools:
             self.feature_mapping_to_numerical_values(df)
             if TwoSigmaFinModTools._is_one_hot_encoder:
                 df = TwoSigmaFinModTools.drop_num_features(df)
-            # self.feature_engineering(df)
+            self.feature_engineering(df)
             df = self.clean_data(df, is_with_MICE=1)
             df = self.feature_scaling(df)
 
@@ -891,7 +892,7 @@ def main():
             # lasso_copy = lasso
 
             # Exclude outliers
-            x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
+            # x_train, y_train = two_sigma_fin_mod_tools.outlier_identification(lasso, x_train, y_train)
             print('\nShape after outlier detection')
             print(np.shape(x_train), np.shape(y_train))
 
@@ -959,7 +960,7 @@ def main():
                 print(score)
 
         ''' xgboost '''
-        is_xgb_cv = 0
+        is_xgb_cv = 1
         if is_xgb_cv:
             seed = 0
             dtrain = xgb.DMatrix(x_train, label=y_train)
@@ -989,14 +990,15 @@ def main():
             print('Ensemble-CV: {0}+{1}'.format(cv_mean, cv_std))
             title_name = 'xgb.cv'
             two_sigma_fin_mod_tools.predicted_vs_actual_y_xgb(xgb, best_nrounds, xgb_params, x_train, y_train,
-                                                            title_name)
+                                                              title_name)
             # plt.show()
             gbdt = xgb.train(xgb_params, dtrain, best_nrounds)
             output_xgb_cv = gbdt.predict(dtest)
 
         # Averaging the output using four different machine learning estimators
         # output = (output_feature_selection_lasso + output_xgb_cv) / 2.0
-        output = output_lasso
+        output = (output_lasso + output_xgb_cv) / 2.0
+        # output = output_lasso
         # output = output_feature_selection_lasso
         # output = output_xgb_cv
 
