@@ -1012,8 +1012,7 @@ def main():
 
         save_path = '/home/mizio/Documents/Kaggle/TwoSigmaFinancialModelling/predicted_vs_actual/'
         if two_sigma_fin_mod_tools.is_portfolio_predictions:
-            text_is_portfolio = ''.join(['Number_of_assets', str(two_sigma_fin_mod_tools.number_of_assets_in_portfolio),
-                                         '_'])
+            text_is_portfolio = ''.join(['Number_of_assets', str(x_train.shape[0]), '_'])
         else:
             text_is_portfolio = ''
         two_sigma_fin_mod_tools.multipage(''.join([save_path, 'Overview_estimators_rmse_', text_is_portfolio,
